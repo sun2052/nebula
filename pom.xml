@@ -13,6 +13,7 @@
 		<module>nebula-utils</module>
 		<module>nebula-context</module>
 		<module>nebula-logging</module>
+		<module>nebula-web</module>
 	</modules>
 
 	<properties>
@@ -22,7 +23,7 @@
 		<maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
 		<maven-jar-plugin.version>3.1.2</maven-jar-plugin.version>
 		<maven-surefire-plugin.version>3.0.0-M3</maven-surefire-plugin.version>
-		<junit.version>5.4.2</junit.version>
+		<junit.version>5.5.1</junit.version>
 	</properties>
 
 	<build>
