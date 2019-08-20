@@ -114,7 +114,9 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
 				}
 
 				// send response
-				response.commit();
+				if (!response.committed()) {
+					response.commit();
+				}
 
 				// complete
 				for (Interceptor interceptor : server.interceptors) {

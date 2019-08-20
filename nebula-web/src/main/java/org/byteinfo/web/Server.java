@@ -63,6 +63,9 @@ public class Server extends Context {
 	// Error Handler
 	ErrorHandler errorHandler = (req, rsp, ex) -> {
 		if (ex instanceof WebException) {
+			if (ex.getCause() != null) {
+				Log.trace(ex.getCause(), "Unexpected error encountered while processing request: {} {}", req.method(), req.path());
+			}
 			rsp.status(((WebException) ex).getStatus());
 			if (rsp.status() == HttpResponseStatus.UNAUTHORIZED) {
 				rsp.result("401 Unauthenticated");  // clarify ambiguous

@@ -7,6 +7,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
@@ -19,6 +20,9 @@ import org.byteinfo.util.misc.Config;
 import org.byteinfo.util.time.WheelTimer;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -26,7 +30,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 public class Request {
 	public static final Map<String, Session> SESSIONS = new ConcurrentHashMap<>(1024);
@@ -34,6 +41,7 @@ public class Request {
 	public static final int SESSION_ID_LENGTH = Config.getInt("session.length");
 	public static final String SESSION_COOKIE_NAME = Config.get("session.name");
 	public static final WheelTimer TIMER = new WheelTimer(60, SESSION_TIMEOUT);
+	public static final String CONTEXT_PATH = Config.get("http.contextPath");
 
 	private ChannelHandlerContext context;
 	private FullHttpRequest request;
@@ -53,7 +61,7 @@ public class Request {
 		this.context = context;
 		this.request = request;
 		query = new QueryStringDecoder(request.uri());
-		path = query.path();
+		path = CONTEXT_PATH + query.path();
 	}
 
 	public HttpMethod method() {
@@ -75,6 +83,19 @@ public class Request {
 	public String param(String name) throws IOException {
 		List<String> list = decodeParams().get(name);
 		return list == null ? null : list.get(0);
+	}
+
+	public <T> T param(Class<?> clazz) {
+		try {
+			Object obj = clazz.getDeclaredConstructor().newInstance();
+			for (Field field : clazz.getDeclaredFields()) {
+				field.setAccessible(true);
+				field.set(obj, Objects.requireNonNull(param(field.getName(), field.getGenericType(), true)));
+			}
+			return (T) obj;
+		} catch (Exception e) {
+			throw new WebException(HttpResponseStatus.BAD_REQUEST, e);
+		}
 	}
 
 	public List<FileUpload> files(String name) throws IOException {
@@ -245,9 +266,13 @@ public class Request {
 		return secured;
 	}
 
+	void setSecured(String secured) {
+		this.secured = secured;
+	}
+
 	private Map<String, List<String>> decodeParams() throws IOException {
 		if (params == null) {
-			params = query.parameters();
+			params = new HashMap<>(query.parameters());
 			uploads = new HashMap<>();
 			String contentType = request.headers().get(HttpHeaderNames.CONTENT_TYPE).toLowerCase();
 			if (HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.toString().equals(contentType) || HttpHeaderValues.MULTIPART_FORM_DATA.toString().equals(contentType)) {
@@ -262,6 +287,8 @@ public class Request {
 							params.computeIfAbsent(name, k -> new ArrayList<>()).add(field.getString());
 						}
 					}
+				} catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
+					// ignore
 				} finally {
 					decoder.destroy();
 				}
@@ -284,7 +311,49 @@ public class Request {
 		return cookies;
 	}
 
-	void setSecured(String secured) {
-		this.secured = secured;
+	private Object param(String name, Type targetType, boolean required) throws IOException {
+		if (targetType instanceof ParameterizedType) {
+			ParameterizedType pType = (ParameterizedType) targetType;
+			Class<?> rType = (Class<?>) pType.getRawType();
+			if (rType == Optional.class) {
+				return Optional.ofNullable(param(name, pType.getActualTypeArguments()[0], false));
+			} else if (rType == List.class) {
+				Class<?> type = (Class<?>) pType.getActualTypeArguments()[0];
+				if (type == String.class) {
+					return params(name);
+				} else if (type == int.class || type == Integer.class) {
+					return params(name).stream().map(Integer::parseInt).collect(Collectors.toList());
+				} else if (type == long.class || type == Long.class) {
+					return params(name).stream().map(Long::parseLong).collect(Collectors.toList());
+				} else if (type == double.class || type == Double.class) {
+					return params(name).stream().map(Double::parseDouble).collect(Collectors.toList());
+				} else if (type == FileUpload.class) {
+					return files(name);
+				}
+			}
+		} else {
+			Class<?> type = (Class<?>) targetType;
+			String value = param(name);
+			if (value == null) {
+				if (required) {
+					throw new IllegalArgumentException("Required argument is absent: " + name);
+				} else {
+					return null;
+				}
+			} else {
+				if (type == String.class) {
+					return value;
+				} else if (type == int.class || type == Integer.class) {
+					return Integer.parseInt(value);
+				} else if (type == long.class || type == Long.class) {
+					return Long.parseLong(value);
+				} else if (type == double.class || type == Double.class) {
+					return Double.parseDouble(value);
+				} else if (type == FileUpload.class) {
+					return file(name);
+				}
+			}
+		}
+		throw new IllegalArgumentException("Unsupported type: " + targetType);
 	}
 }

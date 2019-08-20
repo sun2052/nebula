@@ -9,23 +9,28 @@ public class WebException extends RuntimeException {
 		super(message);
 	}
 
-	public WebException(Throwable cause) {
-		super(cause);
+	public WebException(String message, Throwable cause) {
+		super(message, cause);
 	}
 
 	public WebException(HttpResponseStatus status) {
 		this.status = status;
 	}
 
-	public WebException(String message, Throwable cause) {
-		super(message, cause);
+	public WebException(HttpResponseStatus status, Throwable cause) {
+		super(cause);
+		this.status = status;
+	}
+
+	public WebException(Throwable cause) {
+		super(cause);
 	}
 
 	public WebException(String message, HttpResponseStatus status) {
-		this(message, null, status);
+		this(message, status, null);
 	}
 
-	public WebException(String message, Throwable cause, HttpResponseStatus status) {
+	public WebException(String message, HttpResponseStatus status, Throwable cause) {
 		super(message, cause);
 		this.status = status;
 	}
