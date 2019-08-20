@@ -124,21 +124,22 @@ public class Context {
 
 	private Constructor<?> getConstructor(Key<?> key) {
 		Constructor<?> inject = null;
-		Constructor<?> noarg = null;
-		for (Constructor<?> con : key.type.getDeclaredConstructors()) {
-			if (con.isAnnotationPresent(Inject.class)) {
-				if (inject == null) {
-					inject = con;
-				} else {
-					throw new ContextException(key + ": Multiple @Inject constructors are not supported.");
+		Constructor<?>[] constructors = key.type.getDeclaredConstructors();
+		if (constructors.length == 1) {
+			inject = constructors[0];
+		} else {
+			for (Constructor<?> constructor : constructors) {
+				if (constructor.isAnnotationPresent(Inject.class)) {
+					if (inject == null) {
+						inject = constructor;
+					} else {
+						throw new ContextException(key + ": Multiple @Inject constructors are not supported.");
+					}
 				}
-			} else if (con.getParameterCount() == 0) {
-				noarg = con;
 			}
 		}
-		inject = inject == null ? noarg : inject;
 		if (inject == null) {
-			throw new ContextException(key + ": Either @Inject constructor or no-arg constructor or @Provides method is expected.");
+			throw new ContextException(key + ": Either @Inject constructor or @Provides method is expected.");
 		}
 		inject.setAccessible(true);
 		return inject;
