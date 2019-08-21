@@ -42,6 +42,6 @@ public class Session {
 
 	public void destroy() {
 		timeout.cancel();
-		Request.SESSIONS.remove(id);
+		HttpContext.SESSIONS.remove(id);
 	}
 }

@@ -64,7 +64,7 @@ public class Asset implements Result {
 			ByteBuffer buffer = ByteBuffer.allocate(16);
 			buffer.put(ByteUtil.asBytes(length()));
 			buffer.put(ByteUtil.asBytes(modified()));
-			eTag = "\"" + Base64.getUrlEncoder().encodeToString(buffer.array()) + "\"";
+			eTag = "\"" + Base64.getUrlEncoder().withoutPadding().encodeToString(buffer.array()) + "\"";
 		}
 		return eTag;
 	}

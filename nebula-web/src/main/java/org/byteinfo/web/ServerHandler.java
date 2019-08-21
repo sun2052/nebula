@@ -7,7 +7,6 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.ReferenceCountUtil;
 import org.byteinfo.logging.Log;
 import org.byteinfo.util.misc.Config;
@@ -17,12 +16,10 @@ import java.util.Collections;
 import java.util.Map;
 
 public class ServerHandler extends ChannelInboundHandlerAdapter {
-	private static final String STREAM_ID = HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text().toString();
-	private static final Handler ASSET_HANDLER = new AssetHandler();
-
 	private static final int SSL_PORT = Config.getInt("ssl.port");
 	private static final int BUFFER_SIZE = Config.getInt("response.bufferSize");
 	private static final boolean SSL_ONLY = Config.getBoolean("ssl.enabled") && Config.getBoolean("ssl.only");
+	private static final Handler ASSET_HANDLER = new AssetHandler();
 
 	private final Server server;
 
@@ -41,93 +38,94 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
 					ctx.write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE));
 				}
 
-				Request request = new Request(ctx, req);
-				Response response = new Response(ctx, req, BUFFER_SIZE, req.headers().get(STREAM_ID));
+				HttpContext context = new HttpContext(ctx, req, BUFFER_SIZE);
 
-				// sanitize request if necessary
-				if (SSL_ONLY && !request.secure()) {
+				if (SSL_ONLY && !context.secure()) {
 					String segment = "";
 					if (SSL_PORT != 443) {
 						segment = ":" + SSL_PORT;
 					}
-					response.redirect(HttpResponseStatus.MOVED_PERMANENTLY, "https://" + request.host() + segment + req.uri());
+					context.redirect("https://" + context.host() + segment + req.uri(), HttpResponseStatus.MOVED_PERMANENTLY);
 				}
 
-				// determine request handler:
-				// exact handler
-				Map<String, Handler> map = server.exactHandlers.getOrDefault(request.path(), Collections.emptyMap());
-				Handler handler = map.get(request.method().name());
+				if (!context.committed()) {
+					// exact handler
+					Map<String, Handler> map = server.exactHandlers.getOrDefault(context.path(), Collections.emptyMap());
+					Handler handler = map.get(context.method().name());
 
-				// generic handler
-				if (handler == null) {
-					for (Map.Entry<String, Map<String, Handler>> entry : server.genericHandlers.entrySet()) {
-						if (req.uri().startsWith(entry.getKey())) {
-							handler = entry.getValue().get(request.method().name());
-							break;
-						}
-					}
-				}
-
-				if (handler != null) {
-					request.setSecured(server.securedAttributes.get(handler));
-				}
-
-				// asset handler
-				if (handler == null) {
-					handler = ASSET_HANDLER;
-				}
-
-				Exception ex = null;
-				try {
-					// before
-					for (Interceptor interceptor : server.interceptors) {
-						if (!interceptor.before(request, response, handler)) {
-							break;
-						}
-					}
-
-					// business handler
-					if (response.result() == null) {
-						handler.handle(request, response);
-
-						// after
-						for (int i = server.interceptors.size() - 1; i >= 0; i--) {
-							if (!server.interceptors.get(i).after(request, response, handler)) {
+					// generic handler
+					if (handler == null) {
+						for (Map.Entry<String, Map<String, Handler>> entry : server.genericHandlers.entrySet()) {
+							if (req.uri().startsWith(entry.getKey())) {
+								handler = entry.getValue().get(context.method().name());
 								break;
 							}
 						}
 					}
-				} catch (Exception e) {
-					// strip unnecessary exception
-					if (e.getClass() == InvocationTargetException.class && e.getCause() != null) {
-						ex = (Exception) e.getCause();
-					} else {
-						ex = e;
+
+					if (handler != null) {
+						context.securityAttribute(server.securityAttributes.get(handler));
 					}
 
-					try {
-						server.errorHandler.handle(request, response, ex);
-					} catch (Exception e2) {
-						Log.error(e2, "ErrorHandler for '{} {}' resulted in exception.", request.method(), request.path());
-						response.status(HttpResponseStatus.INTERNAL_SERVER_ERROR);
+					// asset handler
+					if (handler == null) {
+						handler = ASSET_HANDLER;
 					}
-				}
 
-				// send response
-				if (!response.committed()) {
-					response.commit();
-				}
-
-				// complete
-				for (Interceptor interceptor : server.interceptors) {
+					Object result = null;
+					Exception ex = null;
 					try {
-						interceptor.complete(request, response, handler, ex);
+						// before
+						for (Interceptor interceptor : server.interceptors) {
+							interceptor.before(context, handler);
+							if (context.committed()) {
+								break;
+							}
+						}
+
+						// business handler
+						if (!context.committed()) {
+							result = handler.handle(context);
+
+							// after
+							for (int i = server.interceptors.size() - 1; i >= 0; i--) {
+								server.interceptors.get(i).after(context, handler, result);
+								if (context.committed()) {
+									break;
+								}
+							}
+						}
 					} catch (Exception e) {
-						Log.error(e, "Interceptor for '{}' resulted in exception.", request.path());
+						// strip unnecessary exception
+						if (e.getClass() == InvocationTargetException.class && e.getCause() != null) {
+							ex = (Exception) e.getCause();
+						} else {
+							ex = e;
+						}
+
+						try {
+							server.errorHandler.handle(context, ex);
+						} catch (Exception e2) {
+							Log.error(e2, "ErrorHandler for '{} {}' resulted in exception.", context.method(), context.path());
+							context.responseStatus(HttpResponseStatus.INTERNAL_SERVER_ERROR);
+						}
+					}
+
+					// send response
+					if (!context.committed()) {
+						context.commit(result);
+					}
+
+					// complete
+					for (Interceptor interceptor : server.interceptors) {
+						try {
+							interceptor.complete(context, handler, ex);
+						} catch (Exception e) {
+							Log.error(e, "Interceptor for '{}' resulted in exception.", context.path());
+						}
 					}
 				}
-
-				AccessLog.log(request, response, start);
+				AccessLog.log(context, start);
 			}
 		} finally {
 			ReferenceCountUtil.release(msg);

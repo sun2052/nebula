@@ -16,6 +16,6 @@ public interface Hash {
 		for (String string : strings) {
 			digest.update(string.getBytes(StandardCharsets.UTF_8));
 		}
-		return Base64.getUrlEncoder().encodeToString(digest.digest());
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest());
 	}
 }

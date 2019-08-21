@@ -21,7 +21,7 @@ application.properties
 public class MainController {
 	@GET
 	@Path("/")
-	public Object index(Request req, Response rsp) {
+	public Object index(HttpContext context) {
 		return "Hello";
 	}
 }

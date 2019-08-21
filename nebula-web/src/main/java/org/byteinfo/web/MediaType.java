@@ -10,7 +10,6 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MediaType {
-
 	// Extension MediaType Mapping
 	private static final ConcurrentHashMap<String, MediaType> TYPES = new ConcurrentHashMap<>();
 
@@ -175,5 +174,4 @@ public class MediaType {
 	public String toString() {
 		return name;
 	}
-
 }

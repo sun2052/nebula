@@ -13,7 +13,7 @@ public class MVCHandler implements Handler {
 	}
 
 	@Override
-	public void handle(Request request, Response response) throws Exception {
-		response.result(method.invoke(object, request, response));
+	public Object handle(HttpContext context) throws Exception {
+		return method.invoke(object, context);
 	}
 }

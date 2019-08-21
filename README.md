@@ -1,6 +1,6 @@
 # Nebula
 
-Nebula is a set of micro-frameworks and utilities for Java 12+.
+Nebula is a set of micro-frameworks and utilities for Java 11+.
 
 
 ## Modules

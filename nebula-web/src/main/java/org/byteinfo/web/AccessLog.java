@@ -30,16 +30,16 @@ public class AccessLog {
 		}
 	}
 
-	public static void log(Request request, Response response, long startTime) throws IOException {
+	public static void log(HttpContext context, long startTime) throws IOException {
 		String accessLog = Instant.ofEpochMilli(startTime) + "|"
-				+ request.remoteAddress().getHostAddress() + "|"
-				+ request.method() + "|"
-				+ request.path() + "|"
-				+ response.status().code() + "|"
-				+ response.length() + "|"
+				+ context.remoteAddress() + "|"
+				+ context.method() + "|"
+				+ context.path() + "|"
+				+ context.responseStatus().code() + "|"
+				+ context.responseLength() + "|"
 				+ (System.currentTimeMillis() - startTime) + "|"
-				+ request.headers().get(HttpHeaderNames.USER_AGENT) + "|"
-				+ request.headers().get(HttpHeaderNames.REFERER);
+				+ context.headers().get(HttpHeaderNames.USER_AGENT) + "|"
+				+ context.headers().get(HttpHeaderNames.REFERER);
 
 		if (target == null) {
 			System.out.println(accessLog);

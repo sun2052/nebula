@@ -66,7 +66,7 @@ public interface JDBC {
 	 * @throws SQLException if an error occurs
 	 */
 	static long insert(Connection connection, String sql, Object... args) throws SQLException {
-		return batchInsert(connection, sql, new Object[] {args})[0];
+		return batchInsert(connection, sql, args)[0];
 	}
 
 	/**
@@ -102,7 +102,7 @@ public interface JDBC {
 	 * @throws SQLException if the update fails
 	 */
 	static int update(Connection connection, String sql, Object... args) throws SQLException {
-		return batchUpdate(connection, sql, new Object[] {args})[0];
+		return batchUpdate(connection, sql, args)[0];
 	}
 
 	/**

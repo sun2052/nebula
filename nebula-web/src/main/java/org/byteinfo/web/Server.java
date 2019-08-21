@@ -54,31 +54,26 @@ public class Server extends Context {
 	Map<String, Map<String, Handler>> exactHandlers = new HashMap<>();
 	Map<String, Map<String, Handler>> genericHandlers = new LinkedHashMap<>();
 
-	// HTTP Secured Attributes
-	Map<Handler, String> securedAttributes = new HashMap<>();
+	// HTTP Security Attributes
+	Map<Handler, String> securityAttributes = new HashMap<>();
 
 	// HTTP Interceptors
 	List<Interceptor> interceptors = new ArrayList<>();
 
 	// Error Handler
-	ErrorHandler errorHandler = (req, rsp, ex) -> {
+	ErrorHandler errorHandler = (ctx, ex) -> {
+		Throwable t;
 		if (ex instanceof WebException) {
-			if (ex.getCause() != null) {
-				Log.trace(ex.getCause(), "Unexpected error encountered while processing request: {} {}", req.method(), req.path());
-			}
-			rsp.status(((WebException) ex).getStatus());
-			if (rsp.status() == HttpResponseStatus.UNAUTHORIZED) {
-				rsp.result("401 Unauthenticated");  // clarify ambiguous
-			} else if (rsp.status() == HttpResponseStatus.FORBIDDEN) {
-				rsp.result("403 Unauthorized");  // clarify ambiguous
-			} else {
-				rsp.result(rsp.status().toString());
-			}
+			t = ex.getCause();
+			ctx.responseStatus(((WebException) ex).getStatus());
 		} else {
-			Log.error(ex, "Unexpected error encountered while processing request: {} {}", req.method(), req.path());
-			rsp.status(HttpResponseStatus.INTERNAL_SERVER_ERROR);
-			rsp.result(rsp.status().toString());
+			t = ex;
+			ctx.responseStatus(HttpResponseStatus.INTERNAL_SERVER_ERROR);
 		}
+		if (t != null) {
+			Log.error(ex, "Unexpected error encountered while processing request: {} {}", ctx.method(), ctx.path());
+		}
+		return ctx.responseStatus().toString();
 	};
 
 	/**
@@ -153,8 +148,8 @@ public class Server extends Context {
 	/**
 	 * Register Lambda HTTP handler
 	 */
-	public Server handler(String path, HttpMethod method, Handler handler, String secured) {
-		return handler(path, List.of(method), handler, secured);
+	public Server handler(String path, HttpMethod method, Handler handler, String securityAttribute) {
+		return handler(path, List.of(method), handler, securityAttribute);
 	}
 
 	/**
@@ -163,10 +158,10 @@ public class Server extends Context {
 	 * @param path
 	 * @param methods
 	 * @param handler
-	 * @param secured
+	 * @param securityAttribute
 	 * @return
 	 */
-	public Server handler(String path, List<HttpMethod> methods, Handler handler, String secured) {
+	public Server handler(String path, List<HttpMethod> methods, Handler handler, String securityAttribute) {
 		Map<String, Map<String, Handler>> handlers = exactHandlers;
 		if (path.endsWith("*")) {
 			path = path.substring(0, path.length() - 1);
@@ -175,7 +170,7 @@ public class Server extends Context {
 		for (HttpMethod method : methods) {
 			handlers.computeIfAbsent(path, k -> new HashMap<>()).put(method.value(), handler);
 		}
-		securedAttributes.put(handler, secured);
+		securityAttributes.put(handler, securityAttribute);
 		return this;
 	}
 

@@ -4,14 +4,12 @@ package org.byteinfo.web;
  * HTTP Interceptor
  */
 public interface Interceptor {
-	default boolean before(Request request, Response response, Handler handler) throws Exception {
-		return true; // continue pending execution
+	default void before(HttpContext context, Handler handler) throws Exception {
 	}
 
-	default boolean after(Request request, Response response, Handler handler) throws Exception {
-		return true; // continue pending execution
+	default void after(HttpContext context, Handler handler, Object result) throws Exception {
 	}
 
-	default void complete(Request request, Response response, Handler handler, Exception ex) throws Exception {
+	default void complete(HttpContext context, Handler handler, Exception ex) throws Exception {
 	}
 }

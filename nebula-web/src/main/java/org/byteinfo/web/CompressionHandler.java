@@ -8,7 +8,7 @@ import org.byteinfo.util.misc.Config;
 import java.util.HashSet;
 import java.util.Set;
 
-public class  CompressionHandler extends HttpContentCompressor {
+public class CompressionHandler extends HttpContentCompressor {
 	private static final int minLength;
 	private static final Set<String> types = new HashSet<>();
 

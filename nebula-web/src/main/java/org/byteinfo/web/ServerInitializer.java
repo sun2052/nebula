@@ -16,6 +16,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.EventExecutorGroup;
 import org.byteinfo.util.misc.Config;
@@ -70,6 +71,8 @@ public class ServerInitializer extends ChannelInitializer<SocketChannel> {
 		idle(p);
 		p.addLast("aggregator", new HttpObjectAggregator(maxContentLength));
 		compressor(p);
+
+		p.addLast("streamer", new ChunkedWriteHandler());
 		addServerHandler(p);
 	}
 

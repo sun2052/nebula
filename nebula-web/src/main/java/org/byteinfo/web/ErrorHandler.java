@@ -5,5 +5,5 @@ package org.byteinfo.web;
  */
 @FunctionalInterface
 public interface ErrorHandler {
-	void handle(Request request, Response response, Exception ex) throws Exception;
+	Object handle(HttpContext context, Exception ex) throws Exception;
 }
