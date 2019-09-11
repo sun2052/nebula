@@ -16,16 +16,24 @@ application.properties
 
 ## Usage
 
+### MVC API
 ```java
 // Controller
 public class MainController {
 	@GET
 	@Path("/")
 	public Object index(HttpContext context) {
-		return "Hello";
-	}
+		return "Hello, World!";
+	} 
 }
 
 // Bootstrap
 new Server().handler(MainController.class).start();
+```
+
+### Script API
+```java
+Server server = new Server();
+server.get("/", ctx -> "Hello, World!");
+server.start();
 ```

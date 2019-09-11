@@ -52,6 +52,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -130,7 +131,7 @@ public class HttpContext {
 	}
 
 	public List<String> params(String name) throws IOException {
-		return decodeParams().get(name);
+		return decodeParams().getOrDefault(name, Collections.emptyList());
 	}
 
 	public String param(String name) throws IOException {
@@ -158,7 +159,7 @@ public class HttpContext {
 
 	public List<FileUpload> files(String name) throws IOException {
 		decodeParams();
-		return uploads.get(name);
+		return uploads.getOrDefault(name, Collections.emptyList());
 	}
 
 	public FileUpload file(String name) throws IOException {
@@ -580,8 +581,9 @@ public class HttpContext {
 	}
 
 	private void send(ByteBuf buffer) {
+		responseLength = buffer.readableBytes();
 		FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, responseStatus, buffer);
-		responseHeaders.set(HttpHeaderNames.CONTENT_LENGTH, buffer.readableBytes());
+		responseHeaders.set(HttpHeaderNames.CONTENT_LENGTH, responseLength);
 
 		for (Cookie cookie : responseCookies.values()) {
 			String cookieString = ServerCookieEncoder.STRICT.encode(cookie);

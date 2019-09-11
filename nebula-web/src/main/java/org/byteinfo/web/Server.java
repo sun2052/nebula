@@ -118,14 +118,14 @@ public class Server extends Context {
 			Path basePath = clazz.getAnnotation(Path.class);
 			String path = basePath == null ? "" : basePath.value();
 			for (Method method : clazz.getDeclaredMethods()) {
-				List<HttpMethod> httpMethods = new ArrayList<>();
+				List<String> httpMethods = new ArrayList<>();
 				String currentPath = path;
 				for (Annotation annotation : method.getDeclaredAnnotations()) {
 					if (annotation instanceof Path) {
 						currentPath += ((Path) annotation).value();
 					}
 					if (annotation.annotationType().isAnnotationPresent(HttpMethod.class)) {
-						httpMethods.add(annotation.annotationType().getAnnotation(HttpMethod.class));
+						httpMethods.add(annotation.annotationType().getAnnotation(HttpMethod.class).value());
 					}
 				}
 
@@ -141,14 +141,33 @@ public class Server extends Context {
 	/**
 	 * Register Lambda HTTP handler
 	 */
-	public Server handler(String path, HttpMethod method, Handler handler) {
+	public Server get(String path, Handler handler) {
+		return handler(path, HttpMethod.GET, handler);
+	}
+
+	public Server post(String path, Handler handler) {
+		return handler(path, HttpMethod.POST, handler);
+	}
+
+	public Server put(String path, Handler handler) {
+		return handler(path, HttpMethod.PUT, handler);
+	}
+
+	public Server delete(String path, Handler handler) {
+		return handler(path, HttpMethod.DELETE, handler);
+	}
+
+	/**
+	 * Register Lambda HTTP handler
+	 */
+	public Server handler(String path, String method, Handler handler) {
 		return handler(path, method, handler, null);
 	}
 
 	/**
 	 * Register Lambda HTTP handler
 	 */
-	public Server handler(String path, HttpMethod method, Handler handler, String securityAttribute) {
+	public Server handler(String path, String method, Handler handler, String securityAttribute) {
 		return handler(path, List.of(method), handler, securityAttribute);
 	}
 
@@ -161,14 +180,14 @@ public class Server extends Context {
 	 * @param securityAttribute
 	 * @return
 	 */
-	public Server handler(String path, List<HttpMethod> methods, Handler handler, String securityAttribute) {
+	public Server handler(String path, List<String> methods, Handler handler, String securityAttribute) {
 		Map<String, Map<String, Handler>> handlers = exactHandlers;
 		if (path.endsWith("*")) {
 			path = path.substring(0, path.length() - 1);
 			handlers = genericHandlers;
 		}
-		for (HttpMethod method : methods) {
-			handlers.computeIfAbsent(path, k -> new HashMap<>()).put(method.value(), handler);
+		for (String method : methods) {
+			handlers.computeIfAbsent(path, k -> new HashMap<>()).put(method, handler);
 		}
 		securityAttributes.put(handler, securityAttribute);
 		return this;
