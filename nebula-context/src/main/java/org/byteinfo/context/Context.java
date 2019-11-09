@@ -1,5 +1,6 @@
 package org.byteinfo.context;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Qualifier;
@@ -9,11 +10,13 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Context {
 	private final Map<Key<?>, Provider<?>> providers = new ConcurrentHashMap<>();
 	private final Map<Key<?>, Object> singletons = new ConcurrentHashMap<>();
+	private final Map<Class<?>, List<Object[]>> injectFields = new ConcurrentHashMap<>();
+	private final Map<Class<?>, List<Method>> initMethods = new ConcurrentHashMap<>();
 
 	/**
 	 * Creates a new context.
@@ -110,9 +115,12 @@ public class Context {
 		if (provider == null) {
 			Constructor<?> con = getConstructor(key);
 			Provider<?>[] paramProviders = getParamProviders(key, con, deps);
-			provider = getScopedProvider(key, getScope(key.type), () -> {
+			Class<? extends Annotation> scope = getScope(key.type);
+			provider = getScopedProvider(key, scope, () -> {
 				try {
-					return con.newInstance(getActualParams(paramProviders));
+					Object object = con.newInstance(getActualParams(paramProviders));
+					init(object, scope);
+					return object;
 				} catch (ReflectiveOperationException e) {
 					throw new ContextException(e);
 				}
@@ -120,6 +128,61 @@ public class Context {
 			providers.put(key, provider);
 		}
 		return (Provider<T>) provider;
+	}
+
+	private void init(Object target, Class<? extends Annotation> scope) {
+		Class<?> clazz = target.getClass();
+		boolean isSingleton = scope == Singleton.class;
+
+		List<Object[]> fieldList = injectFields.get(clazz);
+		if (fieldList == null) {
+			fieldList = new ArrayList<>();
+			for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
+				for (Field field : current.getDeclaredFields()) {
+					if (field.isAnnotationPresent(Inject.class)) {
+						field.setAccessible(true);
+						Class<?> providerType = field.getType().equals(Provider.class) ? (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0] : null;
+						fieldList.add(new Object[] {field, providerType != null, Key.of((Class<?>) (providerType != null ? providerType : field.getType()), getQualifier(field.getType(), field.getAnnotations()))});
+					}
+				}
+			}
+			if (!isSingleton) {
+				injectFields.put(clazz, fieldList);
+			}
+		}
+		for (Object[] fieldInfo : fieldList) {
+			Field field = (Field) fieldInfo[0];
+			Key<?> key = (Key<?>) fieldInfo[2];
+			try {
+				field.set(target, (boolean) fieldInfo[1] ? provider(key) : instance(key));
+			} catch (ReflectiveOperationException e) {
+				throw new ContextException(String.format("Can't inject field %s in %s", field.getName(), target.getClass().getName()), e);
+			}
+		}
+
+		List<Method> methodList = initMethods.get(clazz);
+		if (methodList == null) {
+			methodList = new ArrayList<>();
+			for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
+				for (Method method : current.getDeclaredMethods()) {
+					if (method.isAnnotationPresent(PostConstruct.class)) {
+						method.setAccessible(true);
+						methodList.add(method);
+					}
+				}
+			}
+			Collections.reverse(methodList);
+			if (!isSingleton) {
+				initMethods.put(clazz, methodList);
+			}
+		}
+		for (Method method : methodList) {
+			try {
+				method.invoke(target);
+			} catch (ReflectiveOperationException e) {
+				throw new ContextException(String.format("Can't call @PostConstruct method %s:%s", method.getClass(), method.getName()), e);
+			}
+		}
 	}
 
 	private Constructor<?> getConstructor(Key<?> key) {

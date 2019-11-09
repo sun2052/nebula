@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class IPv4UtilTest {
 	@Test
-	public void testIPv4UtilTest() {
+	void testIPv4UtilTest() {
 		// https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_blocks
 		byte[] byteAddr = new byte[] {(byte) 0b11010000, (byte) 0b10000010, 0b00011101, 0b00100001};
 		int intAddr = 0b11010000_10000010_00011101_00100001;

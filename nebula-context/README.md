@@ -8,8 +8,8 @@ Lightweight Dependency Injection ([JSR 330](https://www.jcp.org/en/jsr/detail?id
 [Dependency Injection for Java (JSR 330)](https://javaee.github.io/javaee-spec/javadocs/javax/inject/package-summary.html)
 
 * Default Scope: **@Singleton**
-* Fields Injection: **Not Supported**
-* Methods Injection: **Not Supported**
+* @PostConstruct Methods
+* ~~No Methods Injection~~
 
 
 ## Usage

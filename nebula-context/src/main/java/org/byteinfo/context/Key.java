@@ -49,7 +49,7 @@ public class Key<T> {
 	 * @return key
 	 */
 	public static <T> Key<T> of(Class<T> type, String name) {
-		return new Key<>(type, null, name);
+		return new Key<>(type, Named.class, name);
 	}
 
 	/**
