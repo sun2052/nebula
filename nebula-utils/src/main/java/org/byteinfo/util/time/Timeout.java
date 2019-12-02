@@ -12,11 +12,13 @@ public class Timeout {
 	public static final int ST_CANCELLED = 1;
 	public static final int ST_EXPIRED = 2;
 
+	private volatile int state = ST_INIT;
+	private static final AtomicIntegerFieldUpdater<Timeout> STATE_UPDATER = AtomicIntegerFieldUpdater.newUpdater(Timeout.class, "state");
+
 	final CheckedConsumer<Timeout> task;
 	final WheelTimer timer;
 	final long deadline;
-	private volatile int state = ST_INIT;
-	private static final AtomicIntegerFieldUpdater<Timeout> STATE_UPDATER = AtomicIntegerFieldUpdater.newUpdater(Timeout.class, "state");
+	int pendingRounds;
 
 	WheelTimer.Bucket bucket;
 	Timeout next;
@@ -77,7 +79,7 @@ public class Timeout {
 	/**
 	 * Executes this Timeout.
 	 */
-	public void expire() {
+	public void execute() {
 		if (compareAndSetState(ST_INIT, ST_EXPIRED)) {
 			try {
 				task.accept(this);
@@ -104,6 +106,6 @@ public class Timeout {
 
 	@Override
 	public String toString() {
-		return "Timeout{" + "timer=" + timer + ", deadline=" + deadline + ", state=" + state + '}';
+		return "Timeout{" + "state=" + state + ", deadline=" + deadline + ", pendingRounds=" + pendingRounds + '}';
 	}
 }

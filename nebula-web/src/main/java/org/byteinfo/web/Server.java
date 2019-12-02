@@ -245,7 +245,7 @@ public class Server extends Context {
 
 			Map<String, Set<String>> handlers = new TreeMap<>();
 			exactHandlers.forEach((key, value) -> handlers.computeIfAbsent(key, k -> new TreeSet<>()).addAll(value.keySet()));
-			genericHandlers.forEach((key, value) -> handlers.computeIfAbsent(key + "/*", k -> new TreeSet<>()).addAll(value.keySet()));
+			genericHandlers.forEach((key, value) -> handlers.computeIfAbsent(key + "*", k -> new TreeSet<>()).addAll(value.keySet()));
 			Log.info("HTTP Handlers: {}", handlers);
 
 			Log.info("Server started in {}ms.", System.currentTimeMillis() - start);

@@ -10,37 +10,41 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class WheelTimer {
 	private final Bucket[] wheel;
-	private final long duration;
-	private volatile boolean stopped;
+	private final long precision;
+	private final int mask;
 	final Queue<Timeout> pending = new ConcurrentLinkedQueue<>();
 	final Queue<Timeout> cancelled = new ConcurrentLinkedQueue<>();
 	final CheckedConsumer<Exception> exceptionHandler;
+	private volatile boolean started = true;
 
 	public WheelTimer() {
-		this(1, 3600);
+		this(100, 1024);
 	}
 
 	public WheelTimer(int precision, int wheelSize) {
-		this(precision, wheelSize, e -> {
-		});
+		this(precision, wheelSize, e -> {});
 	}
 
 	/**
 	 * Creates a new timer.
 	 *
-	 * @param precision precision in seconds
+	 * @param precision precision in millis
 	 * @param wheelSize the size of the wheel
 	 * @param exceptionHandler exception handler for scheduled task
 	 */
 	public WheelTimer(int precision, int wheelSize, CheckedConsumer<Exception> exceptionHandler) {
 		if (precision <= 0) {
-			throw new IllegalArgumentException("precision must be greater than 0: " + precision);
+			throw new IllegalArgumentException(String.format("precision: %d (expected: precision > 0)", precision));
 		}
-		if (wheelSize <= 0) {
-			throw new IllegalArgumentException("wheelSize must be greater than 0: " + wheelSize);
+		this.precision = precision;
+		if (wheelSize <= 0 || wheelSize > 1 << 30) {
+			throw new IllegalArgumentException(String.format("wheelSize: %d (expected: 0 < wheelSize <= %d)", wheelSize, 1 << 30));
 		}
-		int size = wheelSize + 1;
-		duration = precision * 1000L;
+		int size = 1;
+		while (size < wheelSize) {
+			size <<= 1;
+		}
+		mask = size - 1;
 		wheel = new Bucket[size];
 		for (int i = 0; i < size; i++) {
 			wheel[i] = new Bucket();
@@ -49,33 +53,32 @@ public class WheelTimer {
 
 		Thread worker = new Thread(() -> {
 			int tick = 0;
-			while (!stopped) {
+			while (started) {
 				long currentTime = System.currentTimeMillis();
 				Timeout timeout;
 
-				// process all pending tasks and add to correct positions if necessary
 				while ((timeout = pending.poll()) != null) {
 					if (timeout.state() == Timeout.ST_CANCELLED) {
 						continue;
 					}
 					if (timeout.deadline <= currentTime) {
-						timeout.expire();
+						timeout.execute();
 					} else {
-						int index = (int) ((((timeout.deadline - currentTime) / duration) + tick + 1) % size);
-						wheel[index].add(timeout);
+						int ticks = (int) ((timeout.deadline - currentTime) / precision);
+						timeout.pendingRounds = ticks / wheel.length;
+						wheel[(ticks + tick) & mask].add(timeout);
 					}
 				}
 
-				// process all tasks in current position
-				wheel[tick].expire(currentTime);
+				wheel[tick].execute();
 
-				// clear all cancelled Timeouts
 				while ((timeout = cancelled.poll()) != null) {
-					timeout.bucket.remove(timeout);
+					if (timeout.bucket != null) {
+						timeout.bucket.remove(timeout);
+					}
 				}
 
-				// wait for the next tick
-				long time = duration - (System.currentTimeMillis() - currentTime);
+				long time = precision - (System.currentTimeMillis() - currentTime);
 				if (time > 0) {
 					try {
 						Thread.sleep(time);
@@ -85,8 +88,8 @@ public class WheelTimer {
 				}
 
 				tick++;
-				if (tick == size) {
-					tick -= size;
+				if (tick == wheelSize) {
+					tick -= wheelSize;
 				}
 			}
 		}, "WheelTimer");
@@ -102,7 +105,7 @@ public class WheelTimer {
 	 * @return a handle which is associated with the specified task
 	 */
 	public Timeout newTimeout(CheckedConsumer<Timeout> task, int delay) {
-		if (stopped) {
+		if (!started) {
 			throw new IllegalStateException("WheelTimer has been stopped.");
 		}
 		long deadline = System.currentTimeMillis() + delay * 1000L;
@@ -115,12 +118,25 @@ public class WheelTimer {
 	 * Stops the WheelTimer and ignores all pending tasks.
 	 */
 	public void stop() {
-		stopped = true;
+		started = false;
+	}
+
+	/**
+	 * Gets the default WheelTimer.
+	 *
+	 * @return WheelTimer
+	 */
+	public static WheelTimer getDefault() {
+		return Holder.TIMER;
 	}
 
 	@Override
 	public String toString() {
-		return "WheelTimer{" + "precision=" + duration / 1000 + "s, wheelSize=" + wheel.length + ", stopped=" + stopped + '}';
+		return "WheelTimer{" + "precision=" + precision + "ms, wheelSize=" + wheel.length + ", started=" + started + '}';
+	}
+
+	private static class Holder {
+		private static final WheelTimer TIMER = new WheelTimer();
 	}
 
 	static class Bucket {
@@ -161,13 +177,15 @@ public class WheelTimer {
 			timeout.bucket = null;
 		}
 
-		void expire(long currentTime) {
+		void execute() {
 			Timeout timeout = head;
 			while (timeout != null) {
 				Timeout next = timeout.next;
-				if (timeout.deadline <= currentTime) {
-					timeout.expire();
+				if (timeout.pendingRounds == 0) {
+					timeout.execute();
 					remove(timeout);
+				} else {
+					timeout.pendingRounds--;
 				}
 				timeout = next;
 			}

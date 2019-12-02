@@ -67,7 +67,6 @@ public class HttpContext {
 	public static final int SESSION_TIMEOUT = Config.getInt("session.timeout");
 	public static final int SESSION_ID_LENGTH = Config.getInt("session.length");
 	public static final String SESSION_COOKIE_NAME = Config.get("session.name");
-	public static final WheelTimer TIMER = new WheelTimer(60, SESSION_TIMEOUT);
 
 	public static final String CONTEXT_PATH = Config.get("http.contextPath");
 	public static final long MAX_AGE = Config.getInt("asset.maxAge");
@@ -235,36 +234,8 @@ public class HttpContext {
 		return session(true);
 	}
 
-	public Session session(boolean create) {
-		Cookie cookie = decodeCookies().get(SESSION_COOKIE_NAME);
-		if (cookie != null) {
-			String id = cookie.value();
-			Session session = SESSIONS.get(id);
-			if (session != null) {
-				session.timeout.cancel();
-				session.timeout = TIMER.newTimeout(t -> session.destroy(), SESSION_TIMEOUT);
-				return session;
-			}
-		}
-
-		if (create) {
-			while (true) {
-				String id = RandomUtil.getAlphaNumeric(SESSION_ID_LENGTH);
-				Session session = new Session(id);
-				Session previous = SESSIONS.putIfAbsent(id, session);
-				if (previous == null) {
-					session.timeout = TIMER.newTimeout(t -> session.destroy(), SESSION_TIMEOUT);
-					Cookie c = new DefaultCookie(SESSION_COOKIE_NAME, id);
-					c.setDomain(host());
-					c.setMaxAge(Cookie.UNDEFINED_MAX_AGE);
-					c.setHttpOnly(true);
-					responseCookies.put(SESSION_COOKIE_NAME, c);
-					return session;
-				}
-			}
-		}
-
-		return null;
+	public Session ifSession() {
+		return session(false);
 	}
 
 	public boolean xhr() {
@@ -392,6 +363,38 @@ public class HttpContext {
 			}
 		}
 		throw new IllegalArgumentException("Unsupported type: " + targetType);
+	}
+
+	private Session session(boolean create) {
+		Cookie cookie = decodeCookies().get(SESSION_COOKIE_NAME);
+		if (cookie != null) {
+			String id = cookie.value();
+			Session session = SESSIONS.get(id);
+			if (session != null) {
+				session.timeout.cancel();
+				session.timeout = WheelTimer.getDefault().newTimeout(t -> session.destroy(), SESSION_TIMEOUT);
+				return session;
+			}
+		}
+
+		if (create) {
+			while (true) {
+				String id = RandomUtil.getAlphaNumeric(SESSION_ID_LENGTH);
+				Session session = new Session(id);
+				Session previous = SESSIONS.putIfAbsent(id, session);
+				if (previous == null) {
+					session.timeout = WheelTimer.getDefault().newTimeout(t -> session.destroy(), SESSION_TIMEOUT);
+					Cookie c = new DefaultCookie(SESSION_COOKIE_NAME, id);
+					c.setDomain(host());
+					c.setMaxAge(Cookie.UNDEFINED_MAX_AGE);
+					c.setHttpOnly(true);
+					responseCookies.put(SESSION_COOKIE_NAME, c);
+					return session;
+				}
+			}
+		}
+
+		return null;
 	}
 
 
