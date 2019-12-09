@@ -1,9 +1,11 @@
-# Nebula
+Nebula
+======
 
 Nebula is a set of micro-frameworks and utilities for Java 11+.
 
 
-## Modules
+Modules
+-------
 
 ### [Nebula Utils](nebula-utils)
 
@@ -23,3 +25,11 @@ Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementa
 ### [Nebula Web](nebula-web)
 
 Micro Web Framework
+
+
+Build & Install
+---------------
+
+```
+mvn clean install
+```

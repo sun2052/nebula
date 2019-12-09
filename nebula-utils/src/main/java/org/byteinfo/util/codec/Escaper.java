@@ -8,7 +8,6 @@ import java.io.Writer;
  */
 @FunctionalInterface
 public interface Escaper {
-
 	/**
 	 * Escapes the text and writes to the writer.
 	 *
@@ -75,5 +74,4 @@ public interface Escaper {
 			}
 		}
 	};
-
 }

@@ -14,7 +14,6 @@ import java.nio.file.Path;
  * IOUtil
  */
 public interface IOUtil {
-
 	/**
 	 * Gets a url for accessing the specified resource from classpath.
 	 *
@@ -125,5 +124,4 @@ public interface IOUtil {
 			// ignore
 		}
 	}
-
 }

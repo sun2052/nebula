@@ -18,7 +18,6 @@ import java.util.Map;
  */
 @FunctionalInterface
 public interface RowMapper<T> {
-
 	/**
 	 * Implementations must implement this method to map each row of data in the ResultSet.
 	 * This method should not call next() on the ResultSet; it is only supposed to map values of the current row.
@@ -93,5 +92,4 @@ public interface RowMapper<T> {
 		}
 		throw new UnsupportedOperationException("unsupported type: " + type + ", supported: String, Integer, Long, Boolean, LocalDate, LocalTime, LocalDateTime");
 	}
-
 }

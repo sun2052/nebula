@@ -4,6 +4,7 @@ import org.byteinfo.util.io.IOUtil;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.net.URL;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Properties;
@@ -29,6 +30,19 @@ public class Config {
 	 */
 	public static void load(String resource) throws IOException {
 		PROPERTIES.load(IOUtil.getReader(IOUtil.getResource(resource)));
+	}
+
+	/**
+	 * Load configuration if exist
+	 *
+	 * @param resource configuration
+	 * @throws IOException exception
+	 */
+	public static void loadIf(String resource) throws IOException {
+		URL target = IOUtil.getResource(resource);
+		if (target != null) {
+			PROPERTIES.load(IOUtil.getReader(target));
+		}
 	}
 
 	/**

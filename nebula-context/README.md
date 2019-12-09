@@ -1,9 +1,11 @@
-# Nebula Context
+Nebula Context
+==============
 
 Lightweight Dependency Injection ([JSR 330](https://www.jcp.org/en/jsr/detail?id=330)) Implementation
 
 
-## Documentation
+Documentation
+-------------
 
 [Dependency Injection for Java (JSR 330)](https://javaee.github.io/javaee-spec/javadocs/javax/inject/package-summary.html)
 
@@ -12,7 +14,8 @@ Lightweight Dependency Injection ([JSR 330](https://www.jcp.org/en/jsr/detail?id
 * ~~No Methods Injection~~
 
 
-## Usage
+Usage
+-----
 
 ```java
 // initialize context

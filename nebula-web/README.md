@@ -1,9 +1,11 @@
-# Nebula Web
+Nebula Web
+==========
 
 Micro Web Framework
 
 
-## Configuration
+Configuration
+-------------
 
 Configurations are located in the classpath.
 ```
@@ -14,7 +16,9 @@ org/byteinfo/web/application.properties
 application.properties
 ```
 
-## Usage
+
+Usage
+-----
 
 ### MVC API
 ```java

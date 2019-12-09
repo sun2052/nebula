@@ -4,7 +4,6 @@ package org.byteinfo.util.net;
  * IPv4 Utility
  */
 public interface IPv4Util {
-
 	static byte[] toBytes(int address) {
 		return new byte[] {(byte) (address >>> 24), (byte) (address >>> 16 & 0xff), (byte) (address >>> 8 & 0xff), (byte) (address & 0xff)};
 	}
@@ -63,5 +62,4 @@ public interface IPv4Util {
 	static String toString(long address) {
 		return toString((int) address);
 	}
-
 }

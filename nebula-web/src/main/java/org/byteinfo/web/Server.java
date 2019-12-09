@@ -87,7 +87,7 @@ public class Server extends Context {
 
 		// load configurations
 		Config.load("class:org/byteinfo/web/application.properties");
-		Config.load("class:application.properties");
+		Config.loadIf("class:application.properties");
 
 		// init runtime variables
 		int processors = Runtime.getRuntime().availableProcessors();

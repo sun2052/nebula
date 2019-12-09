@@ -4,7 +4,6 @@ package org.byteinfo.util.reflect;
  * StackUtil
  */
 public interface StackUtil {
-
 	/**
 	 * StackWalker
 	 */
@@ -28,5 +27,4 @@ public interface StackUtil {
 	static StackWalker.StackFrame getStack(int index) {
 		return WALKER.walk(s -> s.skip(index).findFirst()).orElse(null);
 	}
-
 }

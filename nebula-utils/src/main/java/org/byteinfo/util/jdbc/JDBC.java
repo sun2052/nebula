@@ -12,7 +12,6 @@ import java.util.List;
  * JDBC
  */
 public interface JDBC {
-
 	/**
 	 * Query given SQL to create a prepared statement from SQL and a list of arguments to bind to the query, mapping each row to a Java object via a Reflective RowMapper.
 	 *
@@ -131,5 +130,4 @@ public interface JDBC {
 			ps.addBatch();
 		}
 	}
-
 }

@@ -31,6 +31,7 @@ public class Context {
 	private final Map<Key<?>, Object> singletons = new ConcurrentHashMap<>();
 	private final Map<Class<?>, List<Object[]>> injectFields = new ConcurrentHashMap<>();
 	private final Map<Class<?>, List<Method>> initMethods = new ConcurrentHashMap<>();
+	private final TypeProcessor[] typeProcessors;
 
 	/**
 	 * Creates a new context.
@@ -48,7 +49,17 @@ public class Context {
 	 */
 	public Context(Iterable<Object> modules) {
 		providers.put(Key.of(Context.class), () -> this);
+		List<TypeProcessor> list = new ArrayList<>();
 		for (Object module : modules) {
+			if (module instanceof TypeProcessor) {
+				list.add((TypeProcessor) module);
+			}
+		}
+		typeProcessors = list.toArray(new TypeProcessor[0]);
+		for (Object module : modules) {
+			if (module instanceof TypeProcessor) {
+				continue;
+			}
 			for (Method method : module.getClass().getDeclaredMethods()) {
 				if (method.isAnnotationPresent(Provides.class)) {
 					Key<?> key = Key.of(method.getReturnType(), getQualifier(method.getReturnType(), method.getDeclaredAnnotations()));
@@ -187,7 +198,11 @@ public class Context {
 
 	private Constructor<?> getConstructor(Key<?> key) {
 		Constructor<?> inject = null;
-		Constructor<?>[] constructors = key.type.getDeclaredConstructors();
+		Class<?> type = key.type;
+		for (TypeProcessor processor : typeProcessors) {
+			type = processor.process(type);
+		}
+		Constructor<?>[] constructors = type.getDeclaredConstructors();
 		if (constructors.length == 1) {
 			inject = constructors[0];
 		} else {

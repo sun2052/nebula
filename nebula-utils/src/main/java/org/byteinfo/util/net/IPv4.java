@@ -4,7 +4,6 @@ package org.byteinfo.util.net;
  * IPv4
  */
 public class IPv4 {
-
 	private int address;
 
 	private IPv4(int address) {

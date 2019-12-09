@@ -12,7 +12,6 @@ import java.util.Set;
  * ReflectUtil
  */
 public class ReflectUtil {
-
 	/**
 	 * Bypass access control of the specified object.
 	 *

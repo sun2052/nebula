@@ -6,7 +6,6 @@ import java.math.BigInteger;
  * IPv4 Block
  */
 public class IPv4Block {
-
 	private long network;
 	private long broadcast;
 	private int prefix;

@@ -1,9 +1,11 @@
-# Nebula Logging
+Nebula Logging
+==============
 
 Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementation
 
 
-## Configuration
+Configuration
+-------------
 
 Configurations are located in the classpath.
 ```
@@ -14,7 +16,9 @@ org/byteinfo/logging/logging.properties
 logging.properties
 ```
 
-## Usage
+
+Usage
+-----
 
 ```java
 Log.trace("Hello World.");

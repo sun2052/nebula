@@ -4,7 +4,6 @@ package org.byteinfo.util.codec;
  * StringUtil
  */
 public interface StringUtil {
-
 	static String strip(String target) {
 		return target == null ? null : target.strip();
 	}
@@ -54,5 +53,4 @@ public interface StringUtil {
 		}
 		return builder;
 	}
-
 }
