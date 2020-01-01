@@ -22,6 +22,11 @@ Lightweight Dependency Injection ([JSR 330](https://www.jcp.org/en/jsr/detail?id
 Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementation
 
 
+### [Nebula Proxy](nebula-proxy)
+
+Lightweight [ASM-Based](https://asm.ow2.io/) Runtime Proxy Generator
+
+
 ### [Nebula Web](nebula-web)
 
 Micro Web Framework

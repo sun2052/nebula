@@ -13,6 +13,7 @@
 		<module>nebula-utils</module>
 		<module>nebula-context</module>
 		<module>nebula-logging</module>
+		<module>nebula-proxy</module>
 		<module>nebula-web</module>
 	</modules>
 
