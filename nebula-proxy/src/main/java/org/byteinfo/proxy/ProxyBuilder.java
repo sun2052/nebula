@@ -9,9 +9,7 @@ import org.objectweb.asm.Type;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
@@ -70,7 +68,7 @@ public class ProxyBuilder extends ClassVisitor {
 		}
 
 		return new MethodVisitor(ASM7) {
-			private Set<String> annotationTypes = new HashSet<>();
+			private List<String> annotationTypes = new ArrayList<>();
 
 			@Override
 			public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
@@ -80,7 +78,7 @@ public class ProxyBuilder extends ClassVisitor {
 
 			@Override
 			public void visitEnd() {
-				MethodInfo info = new MethodInfo(name, descriptor, annotationTypes);
+				MethodInfo info = new MethodInfo(name, descriptor, annotationTypes.toArray(new String[0]));
 
 				List<Class<? extends Advice>> list = new ArrayList<>(aspects.size());
 				for (Aspect aspect : aspects) {
