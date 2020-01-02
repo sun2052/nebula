@@ -64,7 +64,7 @@ import java.util.stream.Collectors;
 
 public class HttpContext {
 	public static final Map<String, Session> SESSIONS = new ConcurrentHashMap<>(1024);
-	public static final int SESSION_TIMEOUT = Config.getInt("session.timeout");
+	public static final int SESSION_TIMEOUT = Config.getInt("session.timeout") * 60;
 	public static final int SESSION_ID_LENGTH = Config.getInt("session.length");
 	public static final String SESSION_COOKIE_NAME = Config.get("session.name");
 
