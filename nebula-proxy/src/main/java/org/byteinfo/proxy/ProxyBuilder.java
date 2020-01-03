@@ -123,6 +123,16 @@ public class ProxyBuilder extends ClassVisitor {
 											}
 
 											@Override
+											public void visitVarInsn(int opcode, int var) {
+												super.visitVarInsn(opcode, var == 0 ? 0 : var + info.argumentsSize());
+											}
+
+											@Override
+											public void visitIincInsn(int var, int increment) {
+												super.visitIincInsn(var == 0 ? 0 : var + info.argumentsSize(), increment);
+											}
+
+											@Override
 											public void visitIntInsn(int opcode, int operand) {
 												previousOpcode = opcode;
 												previousOperand = operand;

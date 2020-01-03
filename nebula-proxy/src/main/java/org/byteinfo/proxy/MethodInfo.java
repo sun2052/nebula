@@ -11,6 +11,7 @@ public class MethodInfo {
 	private final Type[] argumentTypes;
 	private final Type returnType;
 	private final int[] argumentOffsets;
+	private final int argumentsSize;
 
 	MethodInfo(String name, String descriptor, String[] annotationDescriptors) {
 		this.name = name;
@@ -19,11 +20,16 @@ public class MethodInfo {
 		this.argumentTypes = Type.getArgumentTypes(descriptor);
 		this.returnType = Type.getReturnType(descriptor);
 		argumentOffsets = new int[argumentTypes.length];
-		int offset = 0;
+		argumentOffsets[0] = 1;
+		int size = 0;
 		for (int i = 0; i < argumentTypes.length; i++) {
-			offset += argumentTypes[i].getSize();
-			argumentOffsets[i] = offset;
+			size += argumentTypes[i].getSize();
+			int index = i + 1;
+			if (index < argumentTypes.length) {
+				argumentOffsets[i + 1] = size;
+			}
 		}
+		argumentsSize = size;
 	}
 
 	public String name() {
@@ -65,5 +71,9 @@ public class MethodInfo {
 
 	public int argumentOffset(int index) {
 		return argumentOffsets[index];
+	}
+
+	public int argumentsSize() {
+		return argumentsSize;
 	}
 }
