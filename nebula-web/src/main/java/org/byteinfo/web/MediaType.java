@@ -48,7 +48,7 @@ public class MediaType {
 	/**
 	 * Creates a new MediaType.
 	 *
-	 * @param type The primary type. Required.
+	 * @param type    The primary type. Required.
 	 * @param subtype The secondary type. Required.
 	 */
 	public MediaType(String type, String subtype) {

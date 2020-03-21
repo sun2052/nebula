@@ -60,6 +60,9 @@ public class Server extends Context {
 	// HTTP Interceptors
 	List<Interceptor> interceptors = new ArrayList<>();
 
+	// WebSocket Handlers
+	Map<String, WebSocketHandler> webSocketHandlers = new LinkedHashMap<>();
+
 	// Error Handler
 	ErrorHandler errorHandler = (ctx, ex) -> {
 		Throwable t;
@@ -71,7 +74,7 @@ public class Server extends Context {
 			ctx.responseStatus(HttpResponseStatus.INTERNAL_SERVER_ERROR);
 		}
 		if (t != null) {
-			Log.error(ex, "Unexpected error encountered while processing request: {} {}", ctx.method(), ctx.path());
+			Log.error(ex, "Unexpected error encountered while handling: {} {}", ctx.method(), ctx.requestPath());
 		}
 		return ctx.responseStatus().toString();
 	};
@@ -208,6 +211,36 @@ public class Server extends Context {
 	}
 
 	/**
+	 * Register WebSocket Handler
+	 *
+	 * @param path
+	 * @param handler
+	 * @return
+	 */
+	public Server websocket(String path, WebSocketHandler handler) {
+		webSocketHandlers.put(path, handler);
+		return this;
+	}
+
+	/**
+	 * Register WebSocket Handlers
+	 *
+	 * @param classes
+	 * @return
+	 */
+	@SafeVarargs
+	public final Server websocket(Class<? extends WebSocketHandler>... classes) {
+		for (Class<? extends WebSocketHandler> clazz : classes) {
+			Path path = clazz.getAnnotation(Path.class);
+			if (path == null) {
+				throw new IllegalArgumentException("@Path for WebSocketHandler is required: " + clazz);
+			}
+			websocket(path.value(), instance(clazz));
+		}
+		return this;
+	}
+
+	/**
 	 * Register Exception handler
 	 *
 	 * @param handler
@@ -246,13 +279,34 @@ public class Server extends Context {
 			Map<String, Set<String>> handlers = new TreeMap<>();
 			exactHandlers.forEach((key, value) -> handlers.computeIfAbsent(key, k -> new TreeSet<>()).addAll(value.keySet()));
 			genericHandlers.forEach((key, value) -> handlers.computeIfAbsent(key + "*", k -> new TreeSet<>()).addAll(value.keySet()));
-			Log.info("HTTP Handlers: {}", handlers);
 
-			Log.info("Server started in {}ms.", System.currentTimeMillis() - start);
+			StringBuilder info = new StringBuilder(512).append(System.lineSeparator());
+			if (!handlers.isEmpty()) {
+				info.append(System.lineSeparator()).append("HTTP Handlers:").append(System.lineSeparator());
+				handlers.forEach((path, methods) -> {
+					for (String method : methods) {
+						info.append(String.format("%-8s", method)).append(path).append(System.lineSeparator());
+					}
+				});
+			}
+			if (!webSocketHandlers.isEmpty()) {
+				info.append(System.lineSeparator()).append("WebSocket Handlers:").append(System.lineSeparator());
+				for (String path : new TreeSet<>(webSocketHandlers.keySet())) {
+					info.append(path).append(System.lineSeparator());
+				}
+			}
+
+			info.append(System.lineSeparator()).append("Listening:").append(System.lineSeparator())
+					.append("http://localhost:").append(Config.getInt("http.port")).append(System.lineSeparator());
+			if (Config.getBoolean("ssl.enabled")) {
+				info.append("https://localhost:").append(Config.getInt("ssl.port")).append(System.lineSeparator());
+			}
+
+			Log.info("Server started in {}ms.{}", System.currentTimeMillis() - start, info.toString());
 			return this;
 		} catch (Exception ex) {
 			stop();
-			throw new WebException("An error occurred while starting the application:", ex);
+			throw new WebException("Unexpected error encountered while starting the application: ", ex);
 		}
 	}
 
@@ -303,9 +357,11 @@ public class Server extends Context {
 		return new ServerBootstrap()
 				.group(bossGroup, workerGroup)
 				.channel(NioServerSocketChannel.class)
+				.option(ChannelOption.SO_BACKLOG, 1024)
+				.option(ChannelOption.SO_REUSEADDR, true)
 				.handler(loggingHandler)
-				.childHandler(new ServerInitializer(this, executorGroup, sslContext))
 				.childOption(ChannelOption.TCP_NODELAY, true)
+				.childHandler(new ServerInitializer(this, executorGroup, sslContext))
 				.bind(port).sync().channel();
 	}
 

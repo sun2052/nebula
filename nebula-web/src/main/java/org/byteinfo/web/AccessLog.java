@@ -34,7 +34,7 @@ public class AccessLog {
 		String accessLog = Instant.ofEpochMilli(startTime) + "|"
 				+ context.remoteAddress() + "|"
 				+ context.method() + "|"
-				+ context.path() + "|"
+				+ context.requestPath() + "|"
 				+ context.responseStatus().code() + "|"
 				+ context.responseLength() + "|"
 				+ (System.currentTimeMillis() - startTime) + "|"

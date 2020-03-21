@@ -29,7 +29,7 @@ Lightweight [ASM-Based](https://asm.ow2.io/) Runtime Proxy Generator
 
 ### [Nebula Web](nebula-web)
 
-Micro Web Framework
+Micro Web Framework (HTTP/2 & WebSocket)
 
 
 Build & Install

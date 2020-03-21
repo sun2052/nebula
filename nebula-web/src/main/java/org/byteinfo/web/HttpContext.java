@@ -2,6 +2,7 @@ package org.byteinfo.web;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -76,7 +77,7 @@ public class HttpContext {
 	private FullHttpRequest request;
 	private int bufferSize;
 	private boolean keepAlive;
-	private Map<String, Object> attributes = new HashMap<>();
+	private Map<String, Object> attributes = new ConcurrentHashMap<>();
 	String securityAttribute;
 
 	// request
@@ -84,7 +85,8 @@ public class HttpContext {
 	private Map<String, List<String>> params;
 	private Map<String, List<FileUpload>> uploads;
 	private Map<String, Cookie> cookies;
-	private String path;
+	private String requestPath;
+	private String realPath;
 
 	// response
 	private HttpResponseStatus responseStatus = HttpResponseStatus.OK;
@@ -105,7 +107,8 @@ public class HttpContext {
 		}
 
 		this.query = new QueryStringDecoder(request.uri());
-		this.path = CONTEXT_PATH + query.path();
+		this.requestPath = query.path();
+		this.realPath = requestPath.substring(CONTEXT_PATH.length());
 
 		AsciiString stringIdName = HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text();
 		String streamId = request.headers().get(stringIdName);
@@ -117,12 +120,24 @@ public class HttpContext {
 
 	/* ---------------- Request -------------- */
 
+	public Channel channel() {
+		return context.channel();
+	}
+
 	public HttpMethod method() {
 		return request.method();
 	}
 
-	public String path() {
-		return path;
+	public String requestPath() {
+		return requestPath;
+	}
+
+	public String contextPath() {
+		return CONTEXT_PATH;
+	}
+
+	public String realPath() {
+		return realPath;
 	}
 
 	public Map<String, List<String>> params() throws IOException {
@@ -200,11 +215,7 @@ public class HttpContext {
 		if (host == null) {
 			host = request.headers().get(HttpHeaderNames.HOST);
 		}
-		if (host != null) {
-			return host.split(":")[0];
-		} else {
-			return null;
-		}
+		return host;
 	}
 
 	public int port() {
