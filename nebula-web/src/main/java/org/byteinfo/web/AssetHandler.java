@@ -29,9 +29,12 @@ public class AssetHandler implements Handler {
 	@Override
 	public Object handle(HttpContext context) throws IOException {
 		String path = context.realPath();
+		if ("/".equals(path)) {
+			path = "/index.html";
+		}
 
 		if (pathRoot != null) {
-			Path file = pathRoot.resolve(path);
+			Path file = pathRoot.resolve(path.substring(1));
 			if (Files.exists(file) && Files.isRegularFile(file)) {
 				BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
 				return new Asset(Files.readAllBytes(file), MediaType.byPath(path).orElse(MediaType.OCTETSTREAM), attributes.size(), attributes.lastModifiedTime().toMillis());

@@ -2,6 +2,7 @@ package org.byteinfo.web;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -109,18 +110,22 @@ public class WebSocket {
 	}
 
 	void handle(WebSocketFrame webSocketFrame) {
+		ChannelFuture future = null;
 		if (webSocketFrame instanceof CloseWebSocketFrame) {
 			CloseWebSocketFrame frame = (CloseWebSocketFrame) webSocketFrame;
 			handler.onClose(this, frame.statusCode(), frame.reasonText());
-			handshaker.close(context.channel(), frame.retain()).addListener(ChannelFutureListener.CLOSE);
+			future = handshaker.close(context.channel(), frame.retain());
 		} else if (webSocketFrame instanceof PingWebSocketFrame) {
-			context.write(new PongWebSocketFrame(webSocketFrame.content().retain()));
+			future = context.write(new PongWebSocketFrame(webSocketFrame.content().retain()));
 		} else if (webSocketFrame instanceof TextWebSocketFrame) {
 			TextWebSocketFrame frame = (TextWebSocketFrame) webSocketFrame;
 			handler.onTextMessage(this, frame.text());
 		} else if (webSocketFrame instanceof BinaryWebSocketFrame) {
 			BinaryWebSocketFrame frame = (BinaryWebSocketFrame) webSocketFrame;
 			handler.onBinaryMessage(this, frame.content());
+		}
+		if (future != null) {
+			future.addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE).addListener(ChannelFutureListener.CLOSE);
 		}
 	}
 
