@@ -31,7 +31,7 @@ import org.slf4j.spi.LoggerFactoryBinder;
 /**
  * The binding of {@link LoggerFactory} class with an actual instance of
  * {@link ILoggerFactory} is performed using information returned by this class.
- * 
+ *
  * @author Ceki G&uuml;lc&uuml;
  */
 public class StaticLoggerBinder implements LoggerFactoryBinder {
@@ -57,7 +57,6 @@ public class StaticLoggerBinder implements LoggerFactoryBinder {
     // to avoid constant folding by the compiler, this field must *not* be final
     public static String REQUESTED_API_VERSION = "1.6.99"; // !final
 
-    // Binding specific code:
     private static final String loggerFactoryClassStr = NebulaLogFactory.class.getName();
 
     /**
@@ -67,7 +66,6 @@ public class StaticLoggerBinder implements LoggerFactoryBinder {
     private final ILoggerFactory loggerFactory;
 
     private StaticLoggerBinder() {
-        // Binding specific code:
         loggerFactory = new NebulaLogFactory();
     }
 

@@ -18,8 +18,8 @@ public interface Formatter {
 	 */
 	Formatter DEFAULT = value -> {
 		Object target = value;
-		if (value instanceof Supplier<?>) {
-			target = ((Supplier<?>) value).get();
+		if (value instanceof Supplier<?> supplier) {
+			target = supplier.get();
 		}
 		return String.valueOf(target);
 	};

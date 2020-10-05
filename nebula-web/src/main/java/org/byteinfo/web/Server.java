@@ -1,90 +1,66 @@
 package org.byteinfo.web;
 
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.ApplicationProtocolConfig;
-import io.netty.handler.ssl.ApplicationProtocolNames;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.util.concurrent.DefaultEventExecutorGroup;
-import io.netty.util.concurrent.DefaultThreadFactory;
-import io.netty.util.concurrent.EventExecutorGroup;
 import org.byteinfo.context.Context;
 import org.byteinfo.logging.Log;
 import org.byteinfo.util.function.CheckedConsumer;
-import org.byteinfo.util.io.IOUtil;
 import org.byteinfo.util.misc.Config;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-import static io.netty.handler.ssl.ApplicationProtocolConfig.Protocol;
-import static io.netty.handler.ssl.ApplicationProtocolConfig.SelectedListenerFailureBehavior;
-import static io.netty.handler.ssl.ApplicationProtocolConfig.SelectorFailureBehavior;
-
-/**
- * Web Server
- */
 public class Server extends Context {
-	private final long start = System.currentTimeMillis();
-
-	private EventLoopGroup bossGroup;
-	private EventLoopGroup workerGroup;
-	private DefaultEventExecutorGroup executorGroup;
+	private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
 	private List<CheckedConsumer<Server>> onStartHandlers = new ArrayList<>();
 	private List<CheckedConsumer<Server>> onStopHandlers = new ArrayList<>();
 
 	// HTTP Handlers: path -> (method -> handler)
-	Map<String, Map<String, Handler>> exactHandlers = new HashMap<>();
-	Map<String, Map<String, Handler>> genericHandlers = new LinkedHashMap<>();
+	private final Map<String, Map<String, Handler>> exactHandlers = new HashMap<>();
+	private final Map<String, Map<String, Handler>> genericHandlers = new LinkedHashMap<>();
+
+	// HTTP Filters
+	private final List<Filter> filters = new ArrayList<>();
 
 	// HTTP Security Attributes
 	Map<Handler, String> securityAttributes = new HashMap<>();
 
-	// HTTP Interceptors
-	List<Interceptor> interceptors = new ArrayList<>();
-
-	// WebSocket Handlers
-	Map<String, WebSocketHandler> webSocketHandlers = new LinkedHashMap<>();
-
 	// Error Handler
-	ErrorHandler errorHandler = (ctx, ex) -> {
-		Throwable t;
-		if (ex instanceof WebException) {
-			t = ex.getCause();
-			ctx.responseStatus(((WebException) ex).getStatus());
+	private ErrorHandler errorHandler = (ctx, t) -> {
+		if (t instanceof WebException e) {
+			t = e.getCause();
+			ctx.setResponseStatus(e.getStatus());
 		} else {
-			t = ex;
-			ctx.responseStatus(HttpResponseStatus.INTERNAL_SERVER_ERROR);
+			ctx.setResponseStatus(StatusCode.INTERNAL_SERVER_ERROR);
 		}
 		if (t != null) {
-			Log.error(ex, "Unexpected error encountered while handling: {} {}", ctx.method(), ctx.requestPath());
+			Log.error(t, "Error encountered while handling: {} {}", ctx.method(), ctx.path());
 		}
-		return ctx.responseStatus().toString();
+		return "ERROR: " + ctx.responseStatus();
 	};
 
-	/**
-	 * Creates a server instance.
-	 *
-	 * @param modules
-	 * @throws IOException
-	 */
+	// HTTP Asset Handler
+	private final Handler ASSET_HANDLER;
+
+	private volatile ServerSocket serverSocket;
+	private volatile boolean started;
+
 	public Server(Object... modules) throws IOException {
 		super(modules);
 
@@ -96,9 +72,7 @@ public class Server extends Context {
 		int processors = Runtime.getRuntime().availableProcessors();
 		Config.load(Map.of(
 				"runtime.pid", ProcessHandle.current().pid(),
-				"runtime.processors", processors,
-				"runtime.processors-2x", processors * 2,
-				"runtime.processors-4x", processors * 4));
+				"runtime.processors", processors));
 
 		// system properties have the highest priority
 		Config.load(System.getProperties());
@@ -106,16 +80,112 @@ public class Server extends Context {
 		// interpolate variables
 		Config.interpolate();
 
-		// track resource leak
-		System.setProperty("io.netty.leakDetection.level", Config.get("resource.LeakDetection"));
+		// init asset handler
+		ASSET_HANDLER = new AssetHandler();
 	}
 
-	/**
-	 * Register MVC HTTP handlers
-	 *
-	 * @param classes
-	 * @return
-	 */
+	public Server start() throws Exception {
+		if (started) {
+			return this;
+		}
+		int port = Config.getInt("http.port");
+		int backlog = Config.getInt("http.backlog");
+		InetAddress bindAddr = InetAddress.getByName(Config.get("http.bindAddr"));
+		int timeout = Config.getInt("session.timeout") * 60 * 1000;
+		serverSocket = new ServerSocket(port, backlog, bindAddr);
+		serverSocket.setReuseAddress(true);
+		Thread main = new Thread(() -> {
+			while (started) {
+				try {
+					Socket socket = serverSocket.accept();
+					executor.execute(() -> {
+						try (socket) {
+							Log.debug("Connected: {}", socket);
+							socket.setTcpNoDelay(true);
+							socket.setSoTimeout(timeout);
+							handleConnection(socket);
+						} catch (SocketTimeoutException e) {
+							// ignored
+						} catch (Throwable t) {
+							Log.error(t);
+						} finally {
+							Log.debug("Disconnected: {}", socket);
+						}
+					});
+				} catch (IOException ioe) {
+					throw new RuntimeException(ioe);
+				}
+			}
+		});
+		main.setName(getClass().getSimpleName() + "-" + port);
+		main.start();
+		started = true;
+		for (CheckedConsumer<Server> handler : onStartHandlers) {
+			handler.accept(this);
+		}
+		Log.info("Server started: listening {}", port);
+		return this;
+	}
+
+	public Server stop() throws IOException {
+		if (started) {
+			started = false;
+			serverSocket.close();
+			executor.close();
+			for (CheckedConsumer<Server> handler : onStopHandlers) {
+				try {
+					handler.accept(this);
+				} catch (Exception e) {
+					Log.warn(e);
+				}
+			}
+		}
+		return this;
+	}
+
+	public Server onStart(CheckedConsumer<Server> handler) {
+		onStartHandlers.add(handler);
+		return this;
+	}
+
+	public Server onStop(CheckedConsumer<Server> handler) {
+		onStopHandlers.add(handler);
+		return this;
+	}
+
+	public Server get(String path, Handler handler) {
+		return handler(HttpMethod.GET, path, handler);
+	}
+
+	public Server post(String path, Handler handler) {
+		return handler(HttpMethod.POST, path, handler);
+	}
+
+	public Server put(String path, Handler handler) {
+		return handler(HttpMethod.PUT, path, handler);
+	}
+
+	public Server delete(String path, Handler handler) {
+		return handler(HttpMethod.DELETE, path, handler);
+	}
+
+	public Server handler(String method, String path, Handler handler) {
+		return handler(List.of(method), path, handler, null);
+	}
+
+	public Server handler(List<String> methods, String path, Handler handler, String securityAttribute) {
+		Map<String, Map<String, Handler>> handlers = exactHandlers;
+		if (path.endsWith("*")) {
+			path = path.substring(0, path.length() - 1);
+			handlers = genericHandlers;
+		}
+		for (String method : methods) {
+			handlers.computeIfAbsent(path, k -> new HashMap<>()).put(method, handler);
+		}
+		securityAttributes.put(handler, securityAttribute);
+		return this;
+	}
+
 	public Server handler(Class<?>... classes) {
 		for (Class<?> clazz : classes) {
 			Path basePath = clazz.getAnnotation(Path.class);
@@ -137,246 +207,123 @@ public class Server extends Context {
 				MVCHandler mvcHandler = new MVCHandler(instance(clazz), method);
 				Secured annotation = method.getAnnotation(Secured.class);
 				String securityAttribute = annotation == null ? secured : annotation.value();
-				handler(currentPath, httpMethods, mvcHandler, securityAttribute);
+				handler(httpMethods, currentPath, mvcHandler, securityAttribute);
 			}
 		}
 		return this;
 	}
 
-	/**
-	 * Register Lambda HTTP handler
-	 */
-	public Server get(String path, Handler handler) {
-		return handler(path, HttpMethod.GET, handler);
-	}
-
-	public Server post(String path, Handler handler) {
-		return handler(path, HttpMethod.POST, handler);
-	}
-
-	public Server put(String path, Handler handler) {
-		return handler(path, HttpMethod.PUT, handler);
-	}
-
-	public Server delete(String path, Handler handler) {
-		return handler(path, HttpMethod.DELETE, handler);
-	}
-
-	/**
-	 * Register Lambda HTTP handler
-	 */
-	public Server handler(String path, String method, Handler handler) {
-		return handler(path, method, handler, null);
-	}
-
-	/**
-	 * Register Lambda HTTP handler
-	 */
-	public Server handler(String path, String method, Handler handler, String securityAttribute) {
-		return handler(path, List.of(method), handler, securityAttribute);
-	}
-
-	/**
-	 * Register Lambda HTTP handler
-	 *
-	 * @param path
-	 * @param methods
-	 * @param handler
-	 * @param securityAttribute
-	 * @return
-	 */
-	public Server handler(String path, List<String> methods, Handler handler, String securityAttribute) {
-		Map<String, Map<String, Handler>> handlers = exactHandlers;
-		if (path.endsWith("*")) {
-			path = path.substring(0, path.length() - 1);
-			handlers = genericHandlers;
-		}
-		for (String method : methods) {
-			handlers.computeIfAbsent(path, k -> new HashMap<>()).put(method, handler);
-		}
-		securityAttributes.put(handler, securityAttribute);
+	public Server filter(Filter filter) {
+		filters.add(filter);
 		return this;
 	}
 
-	/**
-	 * Register HTTP interceptors
-	 *
-	 * @param classes
-	 * @return
-	 */
-	@SafeVarargs
-	public final Server interceptor(Class<? extends Interceptor>... classes) {
-		for (Class<? extends Interceptor> clazz : classes) {
-			interceptors.add(instance(clazz));
+	public Server filter(Class<? extends Filter>... classes) {
+		for (Class<? extends Filter> clazz : classes) {
+			filters.add(instance(clazz));
 		}
 		return this;
 	}
 
-	/**
-	 * Register WebSocket Handler
-	 *
-	 * @param path
-	 * @param handler
-	 * @return
-	 */
-	public Server websocket(String path, WebSocketHandler handler) {
-		webSocketHandlers.put(path, handler);
+	public Server error(ErrorHandler handler) {
+		this.errorHandler = handler;
 		return this;
 	}
 
-	/**
-	 * Register WebSocket Handlers
-	 *
-	 * @param classes
-	 * @return
-	 */
-	@SafeVarargs
-	public final Server websocket(Class<? extends WebSocketHandler>... classes) {
-		for (Class<? extends WebSocketHandler> clazz : classes) {
-			Path path = clazz.getAnnotation(Path.class);
-			if (path == null) {
-				throw new IllegalArgumentException("@Path for WebSocketHandler is required: " + clazz);
-			}
-			websocket(path.value(), instance(clazz));
-		}
+	public Server error(Class<? extends ErrorHandler> clazz) {
+		errorHandler = instance(clazz);
 		return this;
 	}
 
-	/**
-	 * Register Exception handler
-	 *
-	 * @param handler
-	 * @return
-	 */
-	public Server error(Class<? extends ErrorHandler> handler) {
-		errorHandler = instance(handler);
-		return this;
-	}
+	private void handleConnection(Socket socket) throws Exception {
+		InputStream in = new BufferedInputStream(socket.getInputStream());
+		OutputStream out = new BufferedOutputStream(socket.getOutputStream());
+		OutputStream nullOut = OutputStream.nullOutputStream();
+		while (true) {
+			HttpContext ctx = null;
+			Object result = null;
+			Handler handler = null;
+			Throwable th = null;
+			try {
+				// parse request
+				ctx = new HttpContext(socket, in, out);
 
-	/**
-	 * Start the server.
-	 *
-	 * @return
-	 */
-	public Server start() {
-		try {
-			Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
+				// exact handler
+				handler = exactHandlers.getOrDefault(ctx.path(), Collections.emptyMap()).get(ctx.method());
 
-			AccessLog.init();
-
-			bossGroup = new NioEventLoopGroup(Config.getInt("thread.boss"), new DefaultThreadFactory("nio-" + "boss"));
-			workerGroup = new NioEventLoopGroup(Config.getInt("thread.worker"), new DefaultThreadFactory("nio-" + "worker"));
-			executorGroup = new DefaultEventExecutorGroup(Config.getInt("thread.task"), new DefaultThreadFactory("task"));
-
-			for (CheckedConsumer<Server> handler : onStartHandlers) {
-				handler.accept(this);
-			}
-
-			LoggingHandler loggingHandler = new LoggingHandler(Server.class);
-			bootstrap(loggingHandler, Config.getInt("http.port"), null);
-			if (Config.getBoolean("ssl.enabled")) {
-				bootstrap(loggingHandler, Config.getInt("ssl.port"), getSslContext());
-			}
-
-			Map<String, Set<String>> handlers = new TreeMap<>();
-			exactHandlers.forEach((key, value) -> handlers.computeIfAbsent(key, k -> new TreeSet<>()).addAll(value.keySet()));
-			genericHandlers.forEach((key, value) -> handlers.computeIfAbsent(key + "*", k -> new TreeSet<>()).addAll(value.keySet()));
-
-			StringBuilder info = new StringBuilder(512).append(System.lineSeparator());
-			if (!handlers.isEmpty()) {
-				info.append(System.lineSeparator()).append("HTTP Handlers:").append(System.lineSeparator());
-				handlers.forEach((path, methods) -> {
-					for (String method : methods) {
-						info.append(String.format("%-8s", method)).append(path).append(System.lineSeparator());
+				// generic handler
+				if (handler == null) {
+					for (Map.Entry<String, Map<String, Handler>> entry : genericHandlers.entrySet()) {
+						if (ctx.path().startsWith(entry.getKey())) {
+							handler = entry.getValue().get(ctx.method());
+							break;
+						}
 					}
-				});
-			}
-			if (!webSocketHandlers.isEmpty()) {
-				info.append(System.lineSeparator()).append("WebSocket Handlers:").append(System.lineSeparator());
-				for (String path : new TreeSet<>(webSocketHandlers.keySet())) {
-					info.append(path).append(System.lineSeparator());
+				}
+
+				// set security attribute
+				if (handler != null) {
+					ctx.setSecurityAttribute(securityAttributes.get(handler));
+				}
+
+				// asset handler
+				if (handler == null) {
+					handler = ASSET_HANDLER;
+				}
+
+				// before
+				for (Filter filter : filters) {
+					filter.before(ctx, handler);
+					if (ctx.isCommitted()) {
+						break;
+					}
+				}
+
+				// handler
+				if (!ctx.isCommitted()) {
+					result = handler.handle(ctx);
+
+					// after
+					for (int i = filters.size() - 1; i >= 0; i--) {
+						filters.get(i).after(ctx, handler, result);
+						if (ctx.isCommitted()) {
+							break;
+						}
+					}
+				}
+			} catch (Throwable t) {
+				th = t;
+				if (ctx == null) { // failed to parse request
+					HttpCodec.writeResponse(out, StatusCode.BAD_REQUEST);
+					throw t;
+				} else {
+					result = errorHandler.handle(ctx, t);
+				}
+			} finally {
+				if (ctx != null) {
+					// send response
+					if (!ctx.isCommitted()) {
+						ctx.commit(result);
+					}
+
+					// complete
+					for (Filter filter : filters) {
+						try {
+							filter.complete(ctx, handler, th);
+						} catch (Exception e) {
+							Log.error(e, "Filter failed: {}", ctx.path());
+						}
+					}
+
+					// clear pending request body
+					ctx.body().transferTo(nullOut);
 				}
 			}
 
-			info.append(System.lineSeparator()).append("Listening:").append(System.lineSeparator())
-					.append("http://localhost:").append(Config.getInt("http.port")).append(System.lineSeparator());
-			if (Config.getBoolean("ssl.enabled")) {
-				info.append("https://localhost:").append(Config.getInt("ssl.port")).append(System.lineSeparator());
-			}
-
-			Log.info("Server started in {}ms.{}", System.currentTimeMillis() - start, info.toString());
-			return this;
-		} catch (Exception ex) {
-			stop();
-			throw new WebException("Unexpected error encountered while starting the application: ", ex);
-		}
-	}
-
-	/**
-	 * Stop the web server.
-	 */
-	public void stop() {
-		Log.info("Stopping server...");
-		for (CheckedConsumer<Server> handler : onStopHandlers) {
-			try {
-				handler.accept(this);
-			} catch (Exception e) {
-				Log.warn(e);
+			// disconnect
+			if ("close".equalsIgnoreCase(ctx.headers().get(HeaderName.CONNECTION))) {
+				break;
 			}
 		}
-		for (EventExecutorGroup group : List.of(bossGroup, workerGroup, executorGroup)) {
-			if (!group.isShuttingDown()) {
-				group.shutdownGracefully();
-			}
-		}
-		AccessLog.destroy();
-		Log.info("Server stopped.");
-	}
-
-	/**
-	 * Register server start handler.
-	 *
-	 * @param handler
-	 * @return
-	 */
-	public Server onStart(CheckedConsumer<Server> handler) {
-		onStartHandlers.add(handler);
-		return this;
-	}
-
-	/**
-	 * Register server stop handler.
-	 *
-	 * @param handler
-	 * @return
-	 */
-	public Server onStop(CheckedConsumer<Server> handler) {
-		onStopHandlers.add(handler);
-		return this;
-	}
-
-	private Channel bootstrap(LoggingHandler loggingHandler, int port, SslContext sslContext) throws InterruptedException {
-		return new ServerBootstrap()
-				.group(bossGroup, workerGroup)
-				.channel(NioServerSocketChannel.class)
-				.option(ChannelOption.SO_BACKLOG, 1024)
-				.option(ChannelOption.SO_REUSEADDR, true)
-				.handler(loggingHandler)
-				.childOption(ChannelOption.TCP_NODELAY, true)
-				.childHandler(new ServerInitializer(this, executorGroup, sslContext))
-				.bind(port).sync().channel();
-	}
-
-	private SslContext getSslContext() throws IOException {
-		String keyStoreCert = Config.get("ssl.cert");
-		String keyStoreKey = Config.get("ssl.key");
-		SslContextBuilder builder = SslContextBuilder.forServer(IOUtil.stream(keyStoreCert), IOUtil.stream(keyStoreKey), Config.get("ssl.password"));
-		if (Config.getBoolean("http.h2")) {
-			builder.applicationProtocolConfig(new ApplicationProtocolConfig(
-					Protocol.ALPN, SelectorFailureBehavior.NO_ADVERTISE, SelectedListenerFailureBehavior.ACCEPT,
-					ApplicationProtocolNames.HTTP_2, ApplicationProtocolNames.HTTP_1_1)
-			);
-		}
-		return builder.build();
 	}
 }

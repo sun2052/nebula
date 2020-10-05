@@ -2,23 +2,11 @@ package org.byteinfo.context;
 
 import javax.inject.Named;
 import java.lang.annotation.Annotation;
-import java.util.Objects;
 
 /**
  * A key used for identifying specific dependency.
  */
-public class Key<T> {
-	public final Class<T> type;
-	public final Class<? extends Annotation> qualifier;
-	public final String name;
-	private final int hash;
-
-	private Key(Class<T> type, Class<? extends Annotation> qualifier, String name) {
-		this.type = type;
-		this.qualifier = qualifier;
-		this.name = name;
-		hash = Objects.hash(type, qualifier, name);
-	}
+public record Key<T>(Class<T> type, Class<? extends Annotation> qualifier, String name) {
 
 	/**
 	 * Gets the key for a given type.
@@ -33,7 +21,7 @@ public class Key<T> {
 	/**
 	 * Gets the key for a given type and qualifier annotation type.
 	 *
-	 * @param type target type
+	 * @param type      target type
 	 * @param qualifier qualifier type
 	 * @return key
 	 */
@@ -55,7 +43,7 @@ public class Key<T> {
 	/**
 	 * Gets the key for a given type and qualifier annotation.
 	 *
-	 * @param type target type
+	 * @param type      target type
 	 * @param qualifier qualifier annotation
 	 * @return key
 	 */
@@ -65,19 +53,6 @@ public class Key<T> {
 		} else {
 			return qualifier.annotationType().equals(Named.class) ? Key.of(type, ((Named) qualifier).value()) : Key.of(type, qualifier.annotationType());
 		}
-	}
-
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) return true;
-		if (o == null || getClass() != o.getClass()) return false;
-		Key<?> key = (Key<?>) o;
-		return Objects.equals(type, key.type) && Objects.equals(qualifier, key.qualifier) && Objects.equals(name, key.name);
-	}
-
-	@Override
-	public int hashCode() {
-		return hash;
 	}
 
 	@Override

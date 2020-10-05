@@ -8,13 +8,13 @@
 		<groupId>org.byteinfo</groupId>
 		<artifactId>nebula-parent</artifactId>
 		<version>1.0-SNAPSHOT</version>
+		<relativePath>../pom.xml</relativePath>
 	</parent>
 
 	<artifactId>nebula-proxy</artifactId>
-	<packaging>jar</packaging>
 
 	<properties>
-		<asm.version>9.0</asm.version>
+		<asm.version>9.3</asm.version>
 	</properties>
 
 	<dependencies>

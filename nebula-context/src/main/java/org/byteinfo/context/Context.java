@@ -51,16 +51,11 @@ public class Context {
 		providers.put(Key.of(Context.class), () -> this);
 		List<TypeProcessor> list = new ArrayList<>();
 		for (Object module : modules) {
-			if (module instanceof Class) {
-				throw new ContextException(((Class<?>) module).getName() + " provided as class instead of an instance.");
+			if (module instanceof Class<?> clazz) {
+				throw new ContextException(clazz.getName() + " provided as class instead of an instance.");
 			}
-			if (module instanceof TypeProcessor) {
-				list.add((TypeProcessor) module);
-			}
-		}
-		typeProcessors = list.toArray(new TypeProcessor[0]);
-		for (Object module : modules) {
-			if (module instanceof TypeProcessor) {
+			if (module instanceof TypeProcessor processor) {
+				list.add(processor);
 				continue;
 			}
 			for (Method method : module.getClass().getDeclaredMethods()) {
@@ -81,6 +76,7 @@ public class Context {
 				}
 			}
 		}
+		typeProcessors = list.toArray(new TypeProcessor[0]);
 	}
 
 	/**
@@ -129,7 +125,7 @@ public class Context {
 		if (provider == null) {
 			Constructor<?> con = getConstructor(key);
 			Provider<?>[] paramProviders = getParamProviders(key, con, deps);
-			Class<? extends Annotation> scope = getScope(key.type);
+			Class<? extends Annotation> scope = getScope(key.type());
 			provider = getScopedProvider(key, scope, () -> {
 				try {
 					Object object = con.newInstance(getActualParams(paramProviders));
@@ -207,7 +203,7 @@ public class Context {
 
 	private Constructor<?> getConstructor(Key<?> key) {
 		Constructor<?> inject = null;
-		Class<?> type = key.type;
+		Class<?> type = key.type();
 		for (TypeProcessor processor : typeProcessors) {
 			type = processor.process(type);
 		}

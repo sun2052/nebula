@@ -7,15 +7,10 @@
 		<groupId>org.byteinfo</groupId>
 		<artifactId>nebula-parent</artifactId>
 		<version>1.0-SNAPSHOT</version>
+		<relativePath>../pom.xml</relativePath>
 	</parent>
 
 	<artifactId>nebula-web</artifactId>
-	<packaging>jar</packaging>
-
-	<properties>
-		<netty.version>4.1.58.Final</netty.version>
-		<slf4j.version>1.7.30</slf4j.version>
-	</properties>
 
 	<dependencies>
 		<dependency>
@@ -27,17 +22,6 @@
 			<groupId>org.byteinfo</groupId>
 			<artifactId>nebula-logging</artifactId>
 			<version>${project.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>io.netty</groupId>
-			<artifactId>netty-codec-http2</artifactId>
-			<version>${netty.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<version>${slf4j.version}</version>
 		</dependency>
 	</dependencies>
 </project>

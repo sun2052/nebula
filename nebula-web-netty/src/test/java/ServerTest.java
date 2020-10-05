@@ -1,6 +1,6 @@
-import org.byteinfo.web.Server;
-import org.byteinfo.web.WebSocket;
-import org.byteinfo.web.WebSocketHandler;
+import org.byteinfo.web.netty.Server;
+import org.byteinfo.web.netty.WebSocket;
+import org.byteinfo.web.netty.WebSocketHandler;
 
 import java.io.IOException;
 

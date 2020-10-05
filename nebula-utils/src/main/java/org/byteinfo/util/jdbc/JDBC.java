@@ -1,12 +1,20 @@
 package org.byteinfo.util.jdbc;
 
+import org.byteinfo.util.reflect.ReflectUtil;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * JDBC
@@ -56,12 +64,33 @@ public interface JDBC {
 	}
 
 	/**
+	 * Query the matched count by the given SQL and a list of arguments.
+	 *
+	 * @param connection the JDBC Connection
+	 * @param sql the SQL statement to execute
+	 * @param args arguments to bind to the query
+	 * @return the matched count
+	 * @throws SQLException if an error occurs
+	 */
+	static int count(Connection connection, String sql, Object... args) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement(sql)) {
+			int index = 1;
+			for (Object arg : args) {
+				ps.setObject(index++, arg);
+			}
+			ResultSet rs = ps.executeQuery();
+			rs.next();
+			return rs.getInt(1);
+		}
+	}
+
+	/**
 	 * Issue a single SQL insert operation via a prepared statement, binding the given arguments.
 	 *
 	 * @param connection the JDBC Connection
 	 * @param sql the SQL statement to execute
 	 * @param args arguments to bind to the query
-	 * @return the generated key
+	 * @return the generated key or -1 if not exists
 	 * @throws SQLException if an error occurs
 	 */
 	static long insert(Connection connection, String sql, Object... args) throws SQLException {
@@ -72,8 +101,7 @@ public interface JDBC {
 			}
 			ps.execute();
 			ResultSet rs = ps.getGeneratedKeys();
-			rs.next();
-			return rs.getLong(1);
+			return rs.next() ? rs.getLong(1) : -1;
 		}
 	}
 
@@ -133,6 +161,129 @@ public interface JDBC {
 			addBatch(ps, argsList);
 			return ps.executeBatch();
 		}
+	}
+
+	static <T> List<T> queryByParam(Connection connection, T query) throws SQLException {
+		return queryByParam(connection, query, null);
+	}
+
+	static <T> List<T> queryByParam(Connection connection, T query, String appendix) throws SQLException {
+		Map<String, Object> params = getAllParams(query);
+		StringBuilder sql = new StringBuilder(256);
+		sql.append("select * from `" + query.getClass().getSimpleName() + "` where 1 = 1");
+		for (String param : params.keySet()) {
+			sql.append(" and `" + param + "` = ?");
+		}
+		if (appendix != null) {
+			sql.append(" ").append(appendix);
+		}
+		return (List<T>) query(connection, query.getClass(), sql.toString(), params.values().toArray());
+	}
+
+	static <T> int countByParam(Connection connection, T query) throws SQLException {
+		Map<String, Object> params = getAllParams(query);
+		StringBuilder sql = new StringBuilder(256);
+		sql.append("select count(*) from `" + query.getClass().getSimpleName() + "` where 1 = 1");
+		for (String param : params.keySet()) {
+			sql.append(" and `" + param + "` = ?");
+		}
+		return count(connection, sql.toString(), params.values().toArray());
+	}
+
+	static <T> long insertData(Connection connection, T data) throws SQLException {
+		Map<String, Object> params = getAllParams(data);
+		if (params.isEmpty()) {
+			return -1;
+		}
+		StringBuilder sql = new StringBuilder(256);
+		sql.append("insert into `" + data.getClass().getSimpleName() + "` (");
+		sql.append(params.keySet().stream().map(k -> "`" + k + "`").collect(Collectors.joining(", ")));
+		sql.append(") values (");
+		List<String> list = new ArrayList<>(params.size());
+		for (int i = 0; i < params.size(); i++) {
+			list.add("?");
+		}
+		sql.append(String.join(", ", list));
+		sql.append(")");
+		return insert(connection, sql.toString(), params.values().toArray());
+	}
+
+	static <T> int updateData(Connection connection, T data) throws SQLException {
+		Map<String, Object> params = getAllParams(data);
+		Object id = params.remove("id");
+		if (params.isEmpty()) {
+			return -1;
+		}
+		StringBuilder sql = new StringBuilder(256);
+		sql.append("update `" + data.getClass().getSimpleName() + "` set ");
+		List<String> list = new ArrayList<>(params.size());
+		for (String param : params.keySet()) {
+			list.add("`" + param + "` = ?");
+		}
+		sql.append(String.join(", ", list));
+		sql.append(" where `id` = ?");
+		List<Object> args = new ArrayList<>(params.values());
+		args.add(id);
+		return update(connection, sql.toString(), args.toArray());
+	}
+
+	static <T> int updateData(Connection connection, T data, T query) throws SQLException {
+		Map<String, Object> values = getAllParams(data);
+		values.remove("id");
+		if (values.isEmpty()) {
+			return -1;
+		}
+		StringBuilder sql = new StringBuilder(256);
+		sql.append("update `" + data.getClass().getSimpleName() + "` set ");
+		List<String> list = new ArrayList<>(values.size());
+		for (String param : values.keySet()) {
+			list.add("`" + param + "` = ?");
+		}
+		sql.append(String.join(", ", list));
+		sql.append(" where 1 = 1");
+		Map<String, Object> params = getAllParams(query);
+		for (String param : params.keySet()) {
+			sql.append(" and `" + param + "` = ?");
+		}
+		return update(connection, sql.toString(), params.values().toArray());
+	}
+
+	static <T> int delete(Connection connection, T query) throws SQLException {
+		Map<String, Object> params = getAllParams(query);
+		if (params.isEmpty()) {
+			return -1;
+		}
+		StringBuilder sql = new StringBuilder(256);
+		sql.append("delete from `" + query.getClass().getSimpleName() + "` where 1 = 1");
+		for (String param : params.keySet()) {
+			sql.append(" and `" + param + "` = ?");
+		}
+		return update(connection, sql.toString(), params.values().toArray());
+	}
+
+	private static Map<String, Object> getAllParams(Object query) throws SQLException {
+		Map<String, Object> map = new HashMap<>();
+		if (query == null) {
+			return map;
+		}
+		Map<String, Field> fields = ReflectUtil.getFields(query.getClass(), field -> {
+			int modifiers = field.getModifiers();
+			return !Modifier.isStatic(modifiers) && !Modifier.isTransient(modifiers);
+		});
+		for (Map.Entry<String, Field> entry : fields.entrySet()) {
+			try {
+				Object value = entry.getValue().get(query);
+				if (value instanceof Optional) {
+					value = ((Optional<?>) value).orElse(null);
+				}
+				if (value != null) {
+					map.putIfAbsent(entry.getValue().getName(), value);
+				}
+			} catch (IllegalAccessException e) {
+				throw new SQLException(e);
+			}
+		}
+		return map;
 	}
 
 	private static void addBatch(PreparedStatement ps, Object[]... argsList) throws SQLException {

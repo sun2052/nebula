@@ -52,7 +52,7 @@ public class Log {
 			MIN_LEVEL = minLevel;
 			WRITERS = writers.toArray(new Writer[0]);
 
-			Runtime.getRuntime().addShutdownHook(new Thread(Log::shutdown));
+			// Runtime.getRuntime().addShutdownHook(new Thread(Log::shutdown));
 		} catch (Exception e) {
 			throw new LogException("Failed to initialize Nebula Logging.", e);
 		}

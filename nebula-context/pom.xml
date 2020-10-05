@@ -8,10 +8,10 @@
 		<groupId>org.byteinfo</groupId>
 		<artifactId>nebula-parent</artifactId>
 		<version>1.0-SNAPSHOT</version>
+		<relativePath>../pom.xml</relativePath>
 	</parent>
 
 	<artifactId>nebula-context</artifactId>
-	<packaging>jar</packaging>
 
 	<properties>
 		<javax.inject.version>1</javax.inject.version>

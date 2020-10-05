@@ -11,7 +11,7 @@ Documentation
 
 * Default Scope: **@Singleton**
 * @PostConstruct Methods
-* ~~No Methods Injection~~
+* **No Methods Injection**
 
 
 Usage

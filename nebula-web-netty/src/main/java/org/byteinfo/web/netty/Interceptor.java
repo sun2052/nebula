@@ -1,4 +1,4 @@
-package org.byteinfo.web;
+package org.byteinfo.web.netty;
 
 /**
  * HTTP Interceptor

@@ -1,4 +1,4 @@
-package org.byteinfo.web;
+package org.byteinfo.web.netty;
 
 import org.byteinfo.util.io.IOUtil;
 
@@ -36,7 +36,7 @@ public class MediaType {
 	static {
 		try {
 			Properties properties = new Properties();
-			try (Reader in = IOUtil.resourceReader("org/byteinfo/web/mime.properties")) {
+			try (Reader in = IOUtil.resourceReader("org/byteinfo/web/netty/mime.properties")) {
 				properties.load(in);
 			}
 			for (Map.Entry<Object, Object> entry : properties.entrySet()) {
@@ -161,8 +161,7 @@ public class MediaType {
 		if (obj == this) {
 			return true;
 		}
-		if (obj instanceof MediaType) {
-			MediaType that = (MediaType) obj;
+		if (obj instanceof MediaType that) {
 			return type.equals(that.type) && subtype.equals(that.subtype);
 		}
 		return false;

@@ -39,37 +39,14 @@ public interface Escaper {
 			for (int i = 0; i < text.length(); i++) {
 				int c = text.charAt(i);
 				switch (c) {
-					case '<':
-						writer.write(LT);
-						break;
-
-					case '>':
-						writer.write(GT);
-						break;
-
-					case '&':
-						writer.write(AMP);
-						break;
-
-					case '\'':
-						writer.write(APOS);
-						break;
-
-					case '"':
-						writer.write(QUOT);
-						break;
-
-					case '`':
-						writer.write(GRAVE);
-						break;
-
-					case '=':
-						writer.write(EQUALS);
-						break;
-
-					default:
-						writer.write(c);
-						break;
+					case '<' -> writer.write(LT);
+					case '>' -> writer.write(GT);
+					case '&' -> writer.write(AMP);
+					case '\'' -> writer.write(APOS);
+					case '"' -> writer.write(QUOT);
+					case '`' -> writer.write(GRAVE);
+					case '=' -> writer.write(EQUALS);
+					default -> writer.write(c);
 				}
 			}
 		}

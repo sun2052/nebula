@@ -2,6 +2,7 @@ package org.byteinfo.util.io;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -179,7 +180,7 @@ public interface IOUtil {
 	 *
 	 * @param closeable the resource to be closed
 	 */
-	static void closeQuietly(AutoCloseable closeable) {
+	static void closeQuietly(Closeable closeable) {
 		if (closeable == null) {
 			return;
 		}

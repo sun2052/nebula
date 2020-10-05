@@ -1,4 +1,4 @@
-package org.byteinfo.web;
+package org.byteinfo.web.netty;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -111,17 +111,14 @@ public class WebSocket {
 
 	void handle(WebSocketFrame webSocketFrame) {
 		ChannelFuture future = null;
-		if (webSocketFrame instanceof CloseWebSocketFrame) {
-			CloseWebSocketFrame frame = (CloseWebSocketFrame) webSocketFrame;
+		if (webSocketFrame instanceof CloseWebSocketFrame frame) {
 			handler.onClose(this, frame.statusCode(), frame.reasonText());
 			future = handshaker.close(context.channel(), frame.retain());
 		} else if (webSocketFrame instanceof PingWebSocketFrame) {
 			future = context.write(new PongWebSocketFrame(webSocketFrame.content().retain()));
-		} else if (webSocketFrame instanceof TextWebSocketFrame) {
-			TextWebSocketFrame frame = (TextWebSocketFrame) webSocketFrame;
+		} else if (webSocketFrame instanceof TextWebSocketFrame frame) {
 			handler.onTextMessage(this, frame.text());
-		} else if (webSocketFrame instanceof BinaryWebSocketFrame) {
-			BinaryWebSocketFrame frame = (BinaryWebSocketFrame) webSocketFrame;
+		} else if (webSocketFrame instanceof BinaryWebSocketFrame frame) {
 			handler.onBinaryMessage(this, frame.content());
 		}
 		if (future != null) {

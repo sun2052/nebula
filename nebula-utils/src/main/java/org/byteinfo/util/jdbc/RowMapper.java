@@ -1,6 +1,9 @@
 package org.byteinfo.util.jdbc;
 
+import org.byteinfo.util.reflect.ReflectUtil;
+
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -10,7 +13,6 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -25,7 +27,7 @@ public interface RowMapper<T> {
 	 * @param rs the ResultSet to map (pre-initialized for the current row)
 	 * @param rowNum the number of the current row; starting at 1
 	 * @return the result object for the current row (may be null)
-	 * @throws SQLException if a SQLException is encountered getting column values (that is, there's no need to catch SQLException)
+	 * @throws SQLException if a SQLException is encountered getting column values
 	 */
 	T mapRow(ResultSet rs, int rowNum) throws SQLException;
 
@@ -42,15 +44,11 @@ public interface RowMapper<T> {
 				if (meta.getColumnCount() == 1) {
 					return type.cast(getObject(type, rs, 1));
 				} else {
-					// get all fields in the hierarchy
-					Map<String, Field> map = new HashMap<>();
-					Class<?> current = type;
-					while (current.getSuperclass() != null) {
-						for (Field field : current.getDeclaredFields()) {
-							map.putIfAbsent(field.getName(), field);
-						}
-						current = current.getSuperclass();
-					}
+					// get all instance fields in the hierarchy
+					Map<String, Field> map = ReflectUtil.getFields(type, field -> {
+						int modifiers = field.getModifiers();
+						return !Modifier.isStatic(modifiers) && !Modifier.isTransient(modifiers);
+					});
 
 					// map column to field using ColumnLabel
 					T target = type.getConstructor().newInstance();
@@ -58,7 +56,6 @@ public interface RowMapper<T> {
 						String name = meta.getColumnLabel(i);
 						Field field = map.get(name);
 						if (field != null) {
-							field.setAccessible(true);
 							field.set(target, getObject(field.getType(), rs, i));
 						}
 					}

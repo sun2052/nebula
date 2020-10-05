@@ -10,7 +10,7 @@ public class Test {
 	static class Target {
 		public String test(String str) {
 			String obj = str + " World.";
-			System.out.println(String.format("Executing: arg=%s, result=%s", str, obj));
+			System.out.printf("Executing: arg=%s, result=%s%n", str, obj);
 			return obj;
 		}
 	}
@@ -20,10 +20,10 @@ public class Test {
 		public Object apply() throws Exception {
 			String arg0 = (String) ProxyTarget.argument(0);
 			String arg1 = "Hi";
-			System.out.println(String.format("Advice1 Before: arg=%s -> arg=%s", arg0, arg1));
+			System.out.printf("Advice1 Before: arg=%s -> arg=%s%n", arg0, arg1);
 			ProxyTarget.setArgument(arg1, 0);
 			Object obj = ProxyTarget.proceed();
-			System.out.println(String.format("Advice1 After: result=%s", obj));
+			System.out.printf("Advice1 After: result=%s%n", obj);
 			return obj;
 		}
 	}
@@ -33,10 +33,10 @@ public class Test {
 		public Object apply() throws Exception {
 			String arg0 = (String) ProxyTarget.argument(0);
 			String arg1 = "Hey";
-			System.out.println(String.format("Advice2 Before: arg=%s -> arg=%s", arg0, arg1));
+			System.out.printf("Advice2 Before: arg=%s -> arg=%s%n", arg0, arg1);
 			ProxyTarget.setArgument(arg1, 0);
 			Object obj = ProxyTarget.proceed();
-			System.out.println(String.format("Advice2 After: result=%s", obj));
+			System.out.printf("Advice2 After: result=%s%n", obj);
 			return obj;
 		}
 	}

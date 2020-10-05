@@ -1,4 +1,4 @@
-package org.byteinfo.web;
+package org.byteinfo.web.netty;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.byteinfo.logging.Rolling;
