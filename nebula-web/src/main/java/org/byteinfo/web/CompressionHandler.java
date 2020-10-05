@@ -1,8 +1,8 @@
 package org.byteinfo.web;
 
 import io.netty.handler.codec.http.HttpContentCompressor;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpUtil;
 import org.byteinfo.util.misc.Config;
 
 import java.util.HashSet;
@@ -25,8 +25,8 @@ public class CompressionHandler extends HttpContentCompressor {
 
 	@Override
 	protected Result beginEncode(HttpResponse headers, String acceptEncoding) throws Exception {
-		String mime = headers.headers().get(HttpHeaderNames.CONTENT_TYPE);
-		if (types.contains(mime)) {
+		CharSequence mimeType = HttpUtil.getMimeType(headers);
+		if (types.contains(String.valueOf(mimeType))) {
 			return super.beginEncode(headers, acceptEncoding);
 		} else {
 			return null;

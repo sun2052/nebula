@@ -51,6 +51,9 @@ public class Context {
 		providers.put(Key.of(Context.class), () -> this);
 		List<TypeProcessor> list = new ArrayList<>();
 		for (Object module : modules) {
+			if (module instanceof Class) {
+				throw new ContextException(((Class<?>) module).getName() + " provided as class instead of an instance.");
+			}
 			if (module instanceof TypeProcessor) {
 				list.add((TypeProcessor) module);
 			}
@@ -130,7 +133,7 @@ public class Context {
 			provider = getScopedProvider(key, scope, () -> {
 				try {
 					Object object = con.newInstance(getActualParams(paramProviders));
-					init(object, scope);
+					init(object, scope, key, deps);
 					return object;
 				} catch (ReflectiveOperationException e) {
 					throw new ContextException(e);
@@ -141,7 +144,7 @@ public class Context {
 		return (Provider<T>) provider;
 	}
 
-	private void init(Object target, Class<? extends Annotation> scope) {
+	private void init(Object target, Class<? extends Annotation> scope, Key<?> targetKey, Set<Key<?>> deps) {
 		Class<?> clazz = target.getClass();
 		boolean isSingleton = scope == Singleton.class;
 
@@ -165,7 +168,13 @@ public class Context {
 			Field field = (Field) fieldInfo[0];
 			Key<?> key = (Key<?>) fieldInfo[2];
 			try {
-				field.set(target, (boolean) fieldInfo[1] ? provider(key) : instance(key));
+				boolean isProvider = (boolean) fieldInfo[1];
+				if (isProvider) {
+					field.set(target, provider(key));
+				} else {
+					deps = checkDependencies(deps, targetKey, key);
+					field.set(target, getProvider(key, deps).get());
+				}
 			} catch (ReflectiveOperationException e) {
 				throw new ContextException(String.format("Can't inject field %s in %s", field.getName(), target.getClass().getName()), e);
 			}
@@ -227,10 +236,6 @@ public class Context {
 		Class<?>[] classes = executable.getParameterTypes();
 		Type[] types = executable.getGenericParameterTypes();
 		Annotation[][] annotations = executable.getParameterAnnotations();
-		if (deps == null) {
-			deps = new LinkedHashSet<>();
-		}
-		deps.add(key);
 		Provider<?>[] params = new Provider[classes.length];
 		for (int i = 0; i < classes.length; i++) {
 			Class<?> type = classes[i];
@@ -240,15 +245,8 @@ public class Context {
 				params[i] = () -> getProvider(Key.of(actualType, qualifier), null);
 			} else {
 				Key<?> newKey = Key.of(type, qualifier);
-				if (deps.contains(newKey)) {
-					List<String> list = new ArrayList<>(deps.size() + 1);
-					for (Key<?> dep : deps) {
-						list.add(dep.toString());
-					}
-					list.add(newKey.toString());
-					throw new ContextException("Circular dependency: " + String.join(" -> ", list));
-				}
-				params[i] = getProvider(Key.of(type, qualifier), new LinkedHashSet<>(deps));
+				deps = checkDependencies(deps, key, newKey);
+				params[i] = getProvider(Key.of(type, qualifier), deps);
 			}
 		}
 		return params;
@@ -307,5 +305,23 @@ public class Context {
 			}
 		}
 		return qualifier;
+	}
+
+	private Set<Key<?>> checkDependencies(Set<Key<?>> deps, Key<?> key, Key<?> newKey) {
+		if (deps == null) {
+			deps = new LinkedHashSet<>();
+		} else {
+			deps = new LinkedHashSet<>(deps);
+		}
+		deps.add(key);
+		if (deps.contains(newKey)) {
+			List<String> list = new ArrayList<>(deps.size() + 1);
+			for (Key<?> dep : deps) {
+				list.add(dep.toString());
+			}
+			list.add(newKey.toString());
+			throw new ContextException("Circular dependency: " + String.join(" -> ", list));
+		}
+		return deps;
 	}
 }

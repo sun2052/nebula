@@ -1,6 +1,6 @@
 package org.byteinfo.util.io;
 
-import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.Reader;
 
 /**
@@ -13,9 +13,9 @@ public interface ResourceLoader {
 	 *
 	 * @param name resource name, e.g. main/main.html
 	 * @return reader for the resource
-	 * @throws Exception if the resource could not be loaded for any reason.
+	 * @throws IOException if the resource could not be loaded for any reason.
 	 */
-	Reader load(String name) throws Exception;
+	Reader load(String name) throws IOException;
 
 	/**
 	 * Empty ResourceLoader
@@ -31,6 +31,6 @@ public interface ResourceLoader {
 	 * @return classpath ResourceLoader
 	 */
 	static ResourceLoader ofClassPath(String root) {
-		return name -> new BufferedReader(IOUtil.getReader(IOUtil.getClassResource(root + name)));
+		return name -> IOUtil.resourceReader(root + name);
 	}
 }

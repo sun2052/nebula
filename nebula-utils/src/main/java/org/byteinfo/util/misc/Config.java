@@ -4,7 +4,6 @@ import org.byteinfo.util.io.IOUtil;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.net.URL;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Properties;
@@ -29,7 +28,7 @@ public class Config {
 	 * @throws IOException exception
 	 */
 	public static void load(String resource) throws IOException {
-		PROPERTIES.load(IOUtil.getReader(IOUtil.getResource(resource)));
+		PROPERTIES.load(IOUtil.reader(resource));
 	}
 
 	/**
@@ -39,9 +38,9 @@ public class Config {
 	 * @throws IOException exception
 	 */
 	public static void loadIf(String resource) throws IOException {
-		URL target = IOUtil.getResource(resource);
-		if (target != null) {
-			PROPERTIES.load(IOUtil.getReader(target));
+		Reader in = IOUtil.reader(resource);
+		if (in != null) {
+			PROPERTIES.load(in);
 		}
 	}
 
@@ -52,7 +51,9 @@ public class Config {
 	 * @throws IOException exception
 	 */
 	public static void load(Reader reader) throws IOException {
-		PROPERTIES.load(reader);
+		try (Reader in = reader) {
+			PROPERTIES.load(in);
+		}
 	}
 
 	/**

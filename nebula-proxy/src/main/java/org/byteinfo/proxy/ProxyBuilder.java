@@ -17,7 +17,7 @@ import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
 import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.ARETURN;
-import static org.objectweb.asm.Opcodes.ASM7;
+import static org.objectweb.asm.Opcodes.ASM9;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
@@ -38,7 +38,7 @@ public class ProxyBuilder extends ClassVisitor {
 	private String superName;
 
 	public ProxyBuilder(ClassWriter cw, List<Aspect> aspects) {
-		super(ASM7);
+		super(ASM9);
 		this.cw = cw;
 		this.aspects = aspects;
 	}
@@ -67,7 +67,7 @@ public class ProxyBuilder extends ClassVisitor {
 			return null;
 		}
 
-		return new MethodVisitor(ASM7) {
+		return new MethodVisitor(ASM9) {
 			private List<String> annotationTypes = new ArrayList<>();
 
 			@Override
@@ -101,13 +101,13 @@ public class ProxyBuilder extends ClassVisitor {
 						String nextMethodName = isLast ? name : name + NAME_SEPARATOR + (i + 1);
 						try {
 							ClassReader cr = new ClassReader(list.get(i).getName());
-							cr.accept(new ClassVisitor(ASM7) {
+							cr.accept(new ClassVisitor(ASM9) {
 								@Override
 								public MethodVisitor visitMethod(int access2, String name2, String descriptor2, String signature2, String[] exceptions2) {
 									if (descriptor2.equals(ADVICE_DESCRIPTOR)) {
 										String currentDescriptor = isFirst ? descriptor : nextDescriptor;
 										MethodVisitor mv = cw.visitMethod(access, currentMethodName, currentDescriptor, signature, exceptions);
-										return new MethodVisitor(ASM7, mv) {
+										return new MethodVisitor(ASM9, mv) {
 											private int previousOpcode;
 											private int previousOperand;
 

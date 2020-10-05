@@ -20,14 +20,10 @@ public class MethodInfo {
 		this.argumentTypes = Type.getArgumentTypes(descriptor);
 		this.returnType = Type.getReturnType(descriptor);
 		argumentOffsets = new int[argumentTypes.length];
-		argumentOffsets[0] = 1;
-		int size = 0;
+		int size = 1;
 		for (int i = 0; i < argumentTypes.length; i++) {
+			argumentOffsets[i] = size;
 			size += argumentTypes[i].getSize();
-			int index = i + 1;
-			if (index < argumentTypes.length) {
-				argumentOffsets[i + 1] = size;
-			}
 		}
 		argumentsSize = size;
 	}

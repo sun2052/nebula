@@ -57,11 +57,10 @@ public interface RowMapper<T> {
 					for (int i = 1; i <= meta.getColumnCount(); i++) {
 						String name = meta.getColumnLabel(i);
 						Field field = map.get(name);
-						if (field == null) {
-							throw new NoSuchFieldException(name);
+						if (field != null) {
+							field.setAccessible(true);
+							field.set(target, getObject(field.getType(), rs, i));
 						}
-						field.setAccessible(true);
-						field.set(target, getObject(field.getType(), rs, i));
 					}
 					return target;
 				}

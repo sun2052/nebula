@@ -65,7 +65,16 @@ public interface JDBC {
 	 * @throws SQLException if an error occurs
 	 */
 	static long insert(Connection connection, String sql, Object... args) throws SQLException {
-		return batchInsert(connection, sql, args)[0];
+		try (PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+			int index = 1;
+			for (Object arg : args) {
+				ps.setObject(index++, arg);
+			}
+			ps.execute();
+			ResultSet rs = ps.getGeneratedKeys();
+			rs.next();
+			return rs.getLong(1);
+		}
 	}
 
 	/**
@@ -101,7 +110,13 @@ public interface JDBC {
 	 * @throws SQLException if the update fails
 	 */
 	static int update(Connection connection, String sql, Object... args) throws SQLException {
-		return batchUpdate(connection, sql, args)[0];
+		try (PreparedStatement ps = connection.prepareStatement(sql)) {
+			int index = 1;
+			for (Object arg : args) {
+				ps.setObject(index++, arg);
+			}
+			return ps.executeUpdate();
+		}
 	}
 
 	/**
@@ -121,9 +136,8 @@ public interface JDBC {
 	}
 
 	private static void addBatch(PreparedStatement ps, Object[]... argsList) throws SQLException {
-		int index;
 		for (Object[] args : argsList) {
-			index = 1;
+			int index = 1;
 			for (Object arg : args) {
 				ps.setObject(index++, arg);
 			}

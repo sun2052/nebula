@@ -7,18 +7,86 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * ReflectUtil
  */
-public class ReflectUtil {
+public interface ReflectUtil {
+
+	/**
+	 * Visits all the fields in the specified class and all of its super classes.
+	 *
+	 * @param clazz target type
+	 * @param visitor field visitor or null, return false to abort
+	 * @return fields map
+	 */
+	static Map<String, Field> visitField(Class<?> clazz, Function<Field, Boolean> visitor) {
+		Map<String, Field> map = new HashMap<>();
+		for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
+			for (Field field : current.getDeclaredFields()) {
+				field.setAccessible(true);
+				Field previous = map.putIfAbsent(field.getName(), field);
+				if (previous == null && visitor != null) {
+					if (!visitor.apply(field)) {
+						return map;
+					}
+				}
+			}
+		}
+		return map;
+	}
+
+	/**
+	 * Visits all the methods in the specified class and all of its super classes.
+	 *
+	 * @param clazz target type
+	 * @param visitor method visitor or null, return false to abort
+	 * @return methods map
+	 */
+	static Map<String, Method> visitMethod(Class<?> clazz, Function<Method, Boolean> visitor) {
+		Map<String, Method> map = new HashMap<>();
+		for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
+			for (Method method : current.getDeclaredMethods()) {
+				method.setAccessible(true);
+				Method previous = map.putIfAbsent(method.getName(), method);
+				if (previous == null && visitor != null) {
+					if (!visitor.apply(method)) {
+						return map;
+					}
+				}
+			}
+		}
+		return map;
+	}
+
+	/**
+	 * Gets all the fields in the specified class and all of its super classes.
+	 *
+	 * @param clazz target type
+	 * @return fields map
+	 */
+	static Map<String, Field> getAllFields(Class<?> clazz) {
+		return visitField(clazz, null);
+	}
+
+	/**
+	 * Gets all the methods in the specified class and all of its super classes.
+	 *
+	 * @param clazz target type
+	 * @return fields map
+	 */
+	static Map<String, Method> getAllMethods(Class<?> clazz) {
+		return visitMethod(clazz, null);
+	}
+
 	/**
 	 * Bypass access control of the specified object.
 	 *
 	 * @param object target object
 	 * @return target object
 	 */
-	public static <T extends AccessibleObject> T makeAccessible(T object) {
+	static <T extends AccessibleObject> T makeAccessible(T object) {
 		object.setAccessible(true);
 		return object;
 	}
@@ -30,7 +98,7 @@ public class ReflectUtil {
 	 * @param name field name
 	 * @return target field or null
 	 */
-	public static Field getField(Class<?> clazz, String name) {
+	static Field getField(Class<?> clazz, String name) {
 		for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
 			for (Field field : current.getDeclaredFields()) {
 				if (field.getName().equals(name)) {
@@ -48,7 +116,7 @@ public class ReflectUtil {
 	 * @param name method name
 	 * @return target method or null
 	 */
-	public static Method getMethod(Class<?> clazz, String name) {
+	static Method getMethod(Class<?> clazz, String name) {
 		for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
 			for (Method method : current.getDeclaredMethods()) {
 				if (method.getName().equals(name)) {
@@ -66,7 +134,7 @@ public class ReflectUtil {
 	 * @param name accessor name
 	 * @return accessor (name > getName > isName) or null
 	 */
-	public static Method getAccessorOn(Class<?> clazz, String name) {
+	static Method getAccessorOn(Class<?> clazz, String name) {
 		Method[] methods = clazz.getDeclaredMethods();
 		Map<String, Method> map = new HashMap<>(methods.length);
 
@@ -102,7 +170,7 @@ public class ReflectUtil {
 	 * @param name accessor name
 	 * @return accessor (name > getName > isName) or null
 	 */
-	public static Method getAccessor(Class<?> clazz, String name) {
+	static Method getAccessor(Class<?> clazz, String name) {
 		for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
 			Method method = getAccessorOn(current, name);
 			if (method != null) {
@@ -119,7 +187,7 @@ public class ReflectUtil {
 	 * @param name method name
 	 * @return target method or null
 	 */
-	public static Method getDefaultAccessor(Class<?> clazz, String name) {
+	static Method getDefaultAccessor(Class<?> clazz, String name) {
 		// enumerate the transitive closure of all interfaces implemented by clazz
 		Set<Class<?>> ifaces = new LinkedHashSet<>();
 		for (Class<?> cc = clazz; cc != null && cc != Object.class; cc = cc.getSuperclass()) {

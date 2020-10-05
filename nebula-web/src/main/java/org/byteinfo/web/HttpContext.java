@@ -78,7 +78,7 @@ public class HttpContext {
 	private int bufferSize;
 	private boolean keepAlive;
 	private Map<String, Object> attributes = new ConcurrentHashMap<>();
-	String securityAttribute;
+	private String securityAttribute;
 
 	// request
 	private QueryStringDecoder query;
@@ -87,12 +87,14 @@ public class HttpContext {
 	private Map<String, Cookie> cookies;
 	private String requestPath;
 	private String realPath;
+	private String genericPath;
+	private Session session;
 
 	// response
 	private HttpResponseStatus responseStatus = HttpResponseStatus.OK;
 	private MediaType responseType = MediaType.OCTETSTREAM;
 	private HttpHeaders responseHeaders = new DefaultHttpHeaders();
-	private Map<String, Cookie> responseCookies = new HashMap<>();
+	private Map<String, Cookie> responseCookies = new LinkedHashMap<>();
 	private long responseLength = -1;
 	private boolean committed;
 
@@ -109,6 +111,7 @@ public class HttpContext {
 		this.query = new QueryStringDecoder(request.uri());
 		this.requestPath = query.path();
 		this.realPath = requestPath.substring(CONTEXT_PATH.length());
+
 
 		AsciiString stringIdName = HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text();
 		String streamId = request.headers().get(stringIdName);
@@ -140,6 +143,10 @@ public class HttpContext {
 		return realPath;
 	}
 
+	public String genericPath() {
+		return genericPath;
+	}
+
 	public Map<String, List<String>> params() throws IOException {
 		return decodeParams();
 	}
@@ -153,12 +160,67 @@ public class HttpContext {
 		return list == null ? null : list.get(0);
 	}
 
-	public <T> T param(Class<?> clazz) {
+	public String param(String name, String defaultValue) throws IOException {
+		String value = param(name);
+		return value == null ? defaultValue : value;
+	}
+
+	public int paramAsInt(String name) {
+		try {
+			return Integer.parseInt(param(name));
+		} catch (Exception e) {
+			throw new WebException(HttpResponseStatus.BAD_REQUEST, e);
+		}
+	}
+
+	public int paramAsInt(String name, int defaultValue) {
+		try {
+			return Integer.parseInt(param(name));
+		} catch (Exception e) {
+			return defaultValue;
+		}
+	}
+
+	public long paramAsLong(String name) {
+		try {
+			return Long.parseLong(param(name));
+		} catch (Exception e) {
+			throw new WebException(HttpResponseStatus.BAD_REQUEST, e);
+		}
+	}
+
+	public long paramAsLong(String name, long defaultValue) {
+		try {
+			return Long.parseLong(param(name));
+		} catch (Exception e) {
+			return defaultValue;
+		}
+	}
+
+	public boolean paramAsBoolean(String name) throws IOException {
+		try {
+			return Boolean.parseBoolean(param(name));
+		} catch (Exception e) {
+			throw new WebException(HttpResponseStatus.BAD_REQUEST, e);
+		}
+	}
+
+	public boolean paramAsBoolean(String name, boolean defaultValue) throws IOException {
+		try {
+			return Boolean.parseBoolean(param(name));
+		} catch (Exception e) {
+			return defaultValue;
+		}
+	}
+
+	public <T> T param(Class<T> clazz) {
 		try {
 			Object obj = clazz.getDeclaredConstructor().newInstance();
-			for (Field field : clazz.getDeclaredFields()) {
-				field.setAccessible(true);
-				field.set(obj, Objects.requireNonNull(param(field.getName(), field.getGenericType(), true)));
+			for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
+				for (Field field : current.getDeclaredFields()) {
+					field.setAccessible(true);
+					field.set(obj, Objects.requireNonNull(param(field.getName(), field.getGenericType(), true)));
+				}
 			}
 			return (T) obj;
 		} catch (Exception e) {
@@ -285,16 +347,20 @@ public class HttpContext {
 		return securityAttribute;
 	}
 
-	void securityAttribute(String attribute) {
+	void setSecurityAttribute(String attribute) {
 		securityAttribute = attribute;
+	}
+
+	void setGenericPath(String genericPath) {
+		this.genericPath = genericPath;
 	}
 
 	private Map<String, List<String>> decodeParams() throws IOException {
 		if (params == null) {
 			params = new HashMap<>(query.parameters());
 			uploads = new HashMap<>();
-			String contentType = request.headers().get(HttpHeaderNames.CONTENT_TYPE);
-			if (HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.toString().equalsIgnoreCase(contentType) || HttpHeaderValues.MULTIPART_FORM_DATA.toString().equalsIgnoreCase(contentType)) {
+			CharSequence mimeType = HttpUtil.getMimeType(request);
+			if (HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.contentEqualsIgnoreCase(mimeType) || HttpHeaderValues.MULTIPART_FORM_DATA.contentEqualsIgnoreCase(mimeType)) {
 				HttpPostRequestDecoder decoder = new HttpPostRequestDecoder(request);
 				try {
 					while (decoder.hasNext()) {
@@ -368,6 +434,8 @@ public class HttpContext {
 					return Long.parseLong(value);
 				} else if (type == double.class || type == Double.class) {
 					return Double.parseDouble(value);
+				} else if (type == boolean.class || type == Boolean.class) {
+					return Boolean.parseBoolean(value);
 				} else if (type == FileUpload.class) {
 					return file(name);
 				}
@@ -377,21 +445,27 @@ public class HttpContext {
 	}
 
 	private Session session(boolean create) {
+		if (session != null) {
+			return session;
+		}
+
 		Cookie cookie = decodeCookies().get(SESSION_COOKIE_NAME);
 		if (cookie != null) {
 			String id = cookie.value();
-			Session session = SESSIONS.get(id);
+			session = SESSIONS.get(id);
 			if (session != null) {
 				session.timeout.cancel();
 				session.timeout = WheelTimer.getDefault().newTimeout(t -> session.destroy(), SESSION_TIMEOUT);
 				return session;
+			} else {
+				removeCookie(SESSION_COOKIE_NAME);
 			}
 		}
 
 		if (create) {
 			while (true) {
 				String id = RandomUtil.getAlphaNumeric(SESSION_ID_LENGTH);
-				Session session = new Session(id);
+				session = new Session(id);
 				Session previous = SESSIONS.putIfAbsent(id, session);
 				if (previous == null) {
 					session.timeout = WheelTimer.getDefault().newTimeout(t -> session.destroy(), SESSION_TIMEOUT);
@@ -489,7 +563,7 @@ public class HttpContext {
 	}
 
 	public Object download(String filename, String location) throws Exception {
-		URL url = IOUtil.getResource(location);
+		URL url = IOUtil.resource(location);
 		if (url == null) {
 			throw new FileNotFoundException(location);
 		}
@@ -509,7 +583,7 @@ public class HttpContext {
 
 	public Object download(String filename, InputStream stream) throws Exception {
 		String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8);
-		responseHeaders.set(HttpHeaderNames.CONTENT_DISPOSITION, String.format("attachment; filename*=%s''%s", encoded, StandardCharsets.UTF_8.name()));
+		responseHeaders.set(HttpHeaderNames.CONTENT_DISPOSITION, String.format("attachment; filename*=%s''%s", StandardCharsets.UTF_8.name(), encoded));
 		return commit(stream);
 	}
 
@@ -572,13 +646,8 @@ public class HttpContext {
 			if (!responseHeaders.contains(HttpHeaderNames.CONTENT_LENGTH)) {
 				responseHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
 			}
-
-			for (Cookie cookie : cookies.values()) {
-				String cookieString = ServerCookieEncoder.STRICT.encode(cookie);
-				responseHeaders.add(HttpHeaderNames.SET_COOKIE, cookieString);
-			}
+			encodeCookies();
 			response.headers().set(responseHeaders);
-
 			context.write(response);
 			context.write(new DefaultHttpContent(buffer));
 			ChannelFuture future = context.writeAndFlush(new HttpChunkedInput(new ChunkedStream(in, bufferSize)));
@@ -598,16 +667,24 @@ public class HttpContext {
 		responseLength = buffer.readableBytes();
 		FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, responseStatus, buffer);
 		responseHeaders.set(HttpHeaderNames.CONTENT_LENGTH, responseLength);
-
-		for (Cookie cookie : responseCookies.values()) {
-			String cookieString = ServerCookieEncoder.STRICT.encode(cookie);
-			responseHeaders.add(HttpHeaderNames.SET_COOKIE, cookieString);
-		}
+		encodeCookies();
 		response.headers().set(responseHeaders);
-
 		ChannelFuture future = context.writeAndFlush(response);
 		if (!keepAlive) {
 			future.addListener(ChannelFutureListener.CLOSE);
+		}
+	}
+
+	private void encodeCookies() {
+		for (Cookie cookie : responseCookies.values()) {
+			if (cookie.domain() == null) {
+				cookie.setDomain(host());
+			}
+			if (cookie.path() == null) {
+				cookie.setPath(contextPath().isEmpty() ? "/" : contextPath());
+			}
+			String cookieString = ServerCookieEncoder.STRICT.encode(cookie);
+			responseHeaders.add(HttpHeaderNames.SET_COOKIE, cookieString);
 		}
 	}
 }

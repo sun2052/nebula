@@ -69,7 +69,6 @@ public class ServerInitializer extends ChannelInitializer<SocketChannel> {
 		idle(p);
 		p.addLast("aggregator", new HttpObjectAggregator(maxContentLength));
 		compressor(p);
-		p.addLast("streamer", new ChunkedWriteHandler());
 		addServerHandler(p);
 	}
 
@@ -86,6 +85,7 @@ public class ServerInitializer extends ChannelInitializer<SocketChannel> {
 	}
 
 	private void addServerHandler(ChannelPipeline p) {
+		p.addLast("streamer", new ChunkedWriteHandler());
 		p.addLast(executor, "serverHandler", new ServerHandler(server));
 	}
 

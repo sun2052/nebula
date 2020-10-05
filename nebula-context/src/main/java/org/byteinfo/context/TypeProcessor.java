@@ -11,5 +11,5 @@ public interface TypeProcessor {
 	 * @param clazz target type
 	 * @return the type to use, either the original or a proxy
 	 */
-	 Class<?> process(Class<?> clazz) ;
+	Class<?> process(Class<?> clazz);
 }

@@ -41,7 +41,7 @@ public class AssetHandler implements Handler {
 			}
 		}
 
-		URL url = IOUtil.getClassResource(classRoot + path);
+		URL url = IOUtil.classResource(classRoot + path);
 		if (url == null) {
 			throw new WebException("Resource not found: " + path, HttpResponseStatus.NOT_FOUND);
 		}

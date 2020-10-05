@@ -2,8 +2,7 @@ package org.byteinfo.logging;
 
 import org.byteinfo.util.io.IOUtil;
 
-import java.io.InputStream;
-import java.net.URL;
+import java.io.Reader;
 import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -20,15 +19,12 @@ public class Log {
 	static {
 		try {
 			Properties props = new Properties();
-			try (InputStream in = IOUtil.getClassResource("org/byteinfo/logging/logging.properties").openStream()) {
+			try (Reader in = IOUtil.resourceReader("org/byteinfo/logging/logging.properties")) {
 				props.load(in);
 			}
-			URL resource = IOUtil.getClassResource("logging.properties");
-			if (resource != null) {
-				try (InputStream in = resource.openStream()) {
-					if (in != null) {
-						props.load(in);
-					}
+			try (Reader in = IOUtil.resourceReader("logging.properties")) {
+				if (in != null) {
+					props.load(in);
 				}
 			}
 

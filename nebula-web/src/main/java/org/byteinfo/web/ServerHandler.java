@@ -28,10 +28,14 @@ import java.util.Map;
 public class ServerHandler extends SimpleChannelInboundHandler<Object> {
 	public static final AttributeKey<String> PATH = AttributeKey.newInstance(ServerHandler.class.getName());
 
+	private static final int PORT = Config.getInt("http.port");
 	private static final int SSL_PORT = Config.getInt("ssl.port");
 	private static final int HTTP_BUFFER_SIZE = Config.getInt("response.bufferSize");
 	private static final int WS_MAX_CONTENT_LENGTH = Config.getInt("ws.maxContentLength");
 	private static final boolean SSL_ONLY = Config.getBoolean("ssl.enabled") && Config.getBoolean("ssl.only");
+	private static final boolean NO_WWW_PREFIX = Config.getBoolean("http.noWwwPrefix");
+	private static final boolean NO_TRAILING_SLASH = Config.getBoolean("http.noTrailingSlash");
+	private static final boolean REQUIRE_SANITIZE = SSL_ONLY || NO_WWW_PREFIX || NO_TRAILING_SLASH;
 	private static final Handler ASSET_HANDLER = new AssetHandler();
 
 	private final Server server;
@@ -81,17 +85,36 @@ public class ServerHandler extends SimpleChannelInboundHandler<Object> {
 			ctx.write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE));
 		}
 
-		if (SSL_ONLY && !context.secure()) {
+		// sanitize request if necessary
+		if (REQUIRE_SANITIZE) {
+			boolean redirect = false;
+			String scheme = "http://";
 			String host = context.host();
-			int index = host.indexOf(':');
-			if (index != -1) {
-				host = host.substring(0, index);
+			int port = PORT;
+			String uri = req.uri();
+			if (SSL_ONLY) {
+				scheme = "https://";
+				port = SSL_PORT;
+				if (!context.secure()) {
+					redirect = true;
+				}
 			}
-			if (SSL_PORT != 443) {
-				host = host + ":" + SSL_PORT;
+			if (NO_WWW_PREFIX && host.startsWith("www.")) {
+				host = host.substring(4);
+				redirect = true;
 			}
-			context.redirect("https://" + host + req.uri(), HttpResponseStatus.MOVED_PERMANENTLY);
-			return;
+			if (NO_TRAILING_SLASH && uri.length() > 1 && uri.endsWith("/")) {
+				uri = uri.substring(0, uri.length() - 1);
+				redirect = true;
+			}
+			if (redirect) {
+				String segment = "";
+				if (port != 80 && port != 443) {
+					segment = ":" + port;
+				}
+				context.redirect(scheme + host + segment + uri, HttpResponseStatus.MOVED_PERMANENTLY);
+				return;
+			}
 		}
 
 		if (!server.webSocketHandlers.isEmpty() && "WebSocket".equalsIgnoreCase(req.headers().get(HttpHeaderNames.UPGRADE))) {
@@ -122,13 +145,14 @@ public class ServerHandler extends SimpleChannelInboundHandler<Object> {
 			for (Map.Entry<String, Map<String, Handler>> entry : server.genericHandlers.entrySet()) {
 				if (req.uri().startsWith(entry.getKey())) {
 					handler = entry.getValue().get(context.method().name());
+					context.setGenericPath(context.requestPath().substring(entry.getKey().length()));
 					break;
 				}
 			}
 		}
 
 		if (handler != null) {
-			context.securityAttribute(server.securityAttributes.get(handler));
+			context.setSecurityAttribute(server.securityAttributes.get(handler));
 		}
 
 		// asset handler

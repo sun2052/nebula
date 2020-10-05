@@ -12,6 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class HashTest {
 	@Test
 	public void testHash() throws NoSuchAlgorithmException {
-		assertEquals("XohImNooBHFR0OVvjcYpJ3NgPQ1qq73WKhHvch0VQtg", Hash.hash("password"));
+		assertEquals("sQnzu7wkTrgkQZF-0G1hi5AI3Qmzvv0bXgc5THBqi7mAsdd4Xll27ASbRt9fEyavWi6m0QP9B8lThf-rDKy8hg", Hash.hash("password"));
 	}
 }

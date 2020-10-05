@@ -18,9 +18,24 @@ public class CircularDependencyTest {
 	}
 
 	@Test
+	void fieldCircularDependencyCaught() {
+		assertThrows(ContextException.class, () -> {
+			Context context = new Context();
+			context.instance(FieldCircle1.class);
+		});
+	}
+
+	@Test
 	void circularDependencyWithProviderAllowed() {
 		Context context = new Context();
 		CircleWithProvider1 circle1 = context.instance(CircleWithProvider1.class);
+		assertNotNull(circle1.circleWithProvider2.circleWithProvider1.get());
+	}
+
+	@Test
+	void fieldCircularDependencyWithProviderAllowed() {
+		Context context = new Context();
+		FieldCircleWithProvider1 circle1 = context.instance(FieldCircleWithProvider1.class);
 		assertNotNull(circle1.circleWithProvider2.circleWithProvider1.get());
 	}
 
@@ -42,6 +57,16 @@ public class CircularDependencyTest {
 		}
 	}
 
+	public static class FieldCircle1 {
+		@Inject
+		private FieldCircle2 circle2;
+	}
+
+	public static class FieldCircle2 {
+		@Inject
+		private FieldCircle1 circle1;
+	}
+
 	public static class CircleWithProvider1 {
 		private final CircleWithProvider2 circleWithProvider2;
 
@@ -58,5 +83,15 @@ public class CircularDependencyTest {
 		public CircleWithProvider2(Provider<CircleWithProvider1> circleWithProvider1) {
 			this.circleWithProvider1 = circleWithProvider1;
 		}
+	}
+
+	public static class FieldCircleWithProvider1 {
+		@Inject
+		private FieldCircleWithProvider2 circleWithProvider2;
+	}
+
+	public static class FieldCircleWithProvider2 {
+		@Inject
+		private Provider<FieldCircleWithProvider1> circleWithProvider1;
 	}
 }

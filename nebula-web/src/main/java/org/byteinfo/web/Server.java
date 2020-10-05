@@ -50,7 +50,7 @@ public class Server extends Context {
 	private List<CheckedConsumer<Server>> onStartHandlers = new ArrayList<>();
 	private List<CheckedConsumer<Server>> onStopHandlers = new ArrayList<>();
 
-	// HTTP Handlers: path -> (method -> route)
+	// HTTP Handlers: path -> (method -> handler)
 	Map<String, Map<String, Handler>> exactHandlers = new HashMap<>();
 	Map<String, Map<String, Handler>> genericHandlers = new LinkedHashMap<>();
 
@@ -120,6 +120,8 @@ public class Server extends Context {
 		for (Class<?> clazz : classes) {
 			Path basePath = clazz.getAnnotation(Path.class);
 			String path = basePath == null ? "" : basePath.value();
+			Secured baseSecured = clazz.getAnnotation(Secured.class);
+			String secured = baseSecured == null ? null : baseSecured.value();
 			for (Method method : clazz.getDeclaredMethods()) {
 				List<String> httpMethods = new ArrayList<>();
 				String currentPath = path;
@@ -134,8 +136,8 @@ public class Server extends Context {
 
 				MVCHandler mvcHandler = new MVCHandler(instance(clazz), method);
 				Secured annotation = method.getAnnotation(Secured.class);
-				String secured = annotation == null ? null : annotation.value();
-				handler(currentPath, httpMethods, mvcHandler, secured);
+				String securityAttribute = annotation == null ? secured : annotation.value();
+				handler(currentPath, httpMethods, mvcHandler, securityAttribute);
 			}
 		}
 		return this;
@@ -368,7 +370,7 @@ public class Server extends Context {
 	private SslContext getSslContext() throws IOException {
 		String keyStoreCert = Config.get("ssl.cert");
 		String keyStoreKey = Config.get("ssl.key");
-		SslContextBuilder builder = SslContextBuilder.forServer(IOUtil.getStream(keyStoreCert), IOUtil.getStream(keyStoreKey), Config.get("ssl.password"));
+		SslContextBuilder builder = SslContextBuilder.forServer(IOUtil.stream(keyStoreCert), IOUtil.stream(keyStoreKey), Config.get("ssl.password"));
 		if (Config.getBoolean("http.h2")) {
 			builder.applicationProtocolConfig(new ApplicationProtocolConfig(
 					Protocol.ALPN, SelectorFailureBehavior.NO_ADVERTISE, SelectedListenerFailureBehavior.ACCEPT,

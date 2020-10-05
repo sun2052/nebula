@@ -3,6 +3,7 @@ package org.byteinfo.web;
 import org.byteinfo.util.io.IOUtil;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
@@ -35,7 +36,9 @@ public class MediaType {
 	static {
 		try {
 			Properties properties = new Properties();
-			properties.load(IOUtil.getStream("class:org/byteinfo/web/mime.properties"));
+			try (Reader in = IOUtil.resourceReader("org/byteinfo/web/mime.properties")) {
+				properties.load(in);
+			}
 			for (Map.Entry<Object, Object> entry : properties.entrySet()) {
 				String[] parts = entry.getValue().toString().split("/");
 				TYPES.put(entry.getKey().toString(), new MediaType(parts[0], parts[1]));
