@@ -3,39 +3,7 @@ package org.byteinfo.proxy;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
-import static org.objectweb.asm.Opcodes.AASTORE;
-import static org.objectweb.asm.Opcodes.ACONST_NULL;
-import static org.objectweb.asm.Opcodes.ALOAD;
-import static org.objectweb.asm.Opcodes.ANEWARRAY;
-import static org.objectweb.asm.Opcodes.ARETURN;
-import static org.objectweb.asm.Opcodes.ASTORE;
-import static org.objectweb.asm.Opcodes.BIPUSH;
-import static org.objectweb.asm.Opcodes.CHECKCAST;
-import static org.objectweb.asm.Opcodes.DLOAD;
-import static org.objectweb.asm.Opcodes.DRETURN;
-import static org.objectweb.asm.Opcodes.DSTORE;
-import static org.objectweb.asm.Opcodes.DUP;
-import static org.objectweb.asm.Opcodes.FLOAD;
-import static org.objectweb.asm.Opcodes.FRETURN;
-import static org.objectweb.asm.Opcodes.FSTORE;
-import static org.objectweb.asm.Opcodes.GETSTATIC;
-import static org.objectweb.asm.Opcodes.ICONST_0;
-import static org.objectweb.asm.Opcodes.ICONST_1;
-import static org.objectweb.asm.Opcodes.ICONST_2;
-import static org.objectweb.asm.Opcodes.ICONST_3;
-import static org.objectweb.asm.Opcodes.ICONST_4;
-import static org.objectweb.asm.Opcodes.ICONST_5;
-import static org.objectweb.asm.Opcodes.ILOAD;
-import static org.objectweb.asm.Opcodes.INVOKESTATIC;
-import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
-import static org.objectweb.asm.Opcodes.IRETURN;
-import static org.objectweb.asm.Opcodes.ISTORE;
-import static org.objectweb.asm.Opcodes.LLOAD;
-import static org.objectweb.asm.Opcodes.LRETURN;
-import static org.objectweb.asm.Opcodes.LSTORE;
-import static org.objectweb.asm.Opcodes.POP;
-import static org.objectweb.asm.Opcodes.RETURN;
-import static org.objectweb.asm.Opcodes.SIPUSH;
+import static org.objectweb.asm.Opcodes.*;
 
 interface AsmUtil {
 	String BINARY_NAME_OBJECT = "java/lang/Object";
@@ -88,45 +56,15 @@ interface AsmUtil {
 
 	static void boxing(MethodVisitor mv, Type type) {
 		switch (type.getDescriptor().charAt(0)) {
-			case 'V':
-				mv.visitInsn(ACONST_NULL);
-				break;
-
-			case 'I':
-				valueOfInteger(mv);
-				break;
-
-			case 'J':
-				valueOfLong(mv);
-				break;
-
-			case 'Z':
-				valueOfBoolean(mv);
-				break;
-
-			case 'C':
-				valueOfCharacter(mv);
-				break;
-
-			case 'B':
-				valueOfByte(mv);
-				break;
-
-			case 'S':
-				valueOfShort(mv);
-				break;
-
-			case 'F':
-				valueOfFloat(mv);
-				break;
-
-			case 'D':
-				valueOfDouble(mv);
-				break;
-
-			default:
-				// ignore
-				break;
+			case 'V' -> mv.visitInsn(ACONST_NULL);
+			case 'I' -> valueOfInteger(mv);
+			case 'J' -> valueOfLong(mv);
+			case 'Z' -> valueOfBoolean(mv);
+			case 'C' -> valueOfCharacter(mv);
+			case 'B' -> valueOfByte(mv);
+			case 'S' -> valueOfShort(mv);
+			case 'F' -> valueOfFloat(mv);
+			case 'D' -> valueOfDouble(mv);
 		}
 	}
 
@@ -172,45 +110,15 @@ interface AsmUtil {
 
 	static void unboxing(MethodVisitor mv, Type type) {
 		switch (type.getDescriptor().charAt(0)) {
-			case 'V':
-				mv.visitInsn(POP);
-				break;
-
-			case 'I':
-				intValue(mv);
-				break;
-
-			case 'J':
-				longValue(mv);
-				break;
-
-			case 'Z':
-				booleanValue(mv);
-				break;
-
-			case 'C':
-				charValue(mv);
-				break;
-
-			case 'B':
-				byteValue(mv);
-				break;
-
-			case 'S':
-				shortValue(mv);
-				break;
-
-			case 'F':
-				floatValue(mv);
-				break;
-
-			case 'D':
-				doubleValue(mv);
-				break;
-
-			default:
-				// ignore
-				break;
+			case 'V' -> mv.visitInsn(POP);
+			case 'I' -> intValue(mv);
+			case 'J' -> longValue(mv);
+			case 'Z' -> booleanValue(mv);
+			case 'C' -> charValue(mv);
+			case 'B' -> byteValue(mv);
+			case 'S' -> shortValue(mv);
+			case 'F' -> floatValue(mv);
+			case 'D' -> doubleValue(mv);
 		}
 	}
 
@@ -232,45 +140,16 @@ interface AsmUtil {
 
 	static void loadClass(MethodVisitor mv, Type type) {
 		switch (type.getDescriptor().charAt(0)) {
-			case 'V':
-				mv.visitFieldInsn(GETSTATIC, BINARY_NAME_VOID, "TYPE", DESCRIPTOR_CLASS);
-				break;
-
-			case 'I':
-				mv.visitFieldInsn(GETSTATIC, BINARY_NAME_INTEGER, "TYPE", DESCRIPTOR_CLASS);
-				break;
-
-			case 'J':
-				mv.visitFieldInsn(GETSTATIC, BINARY_NAME_LONG, "TYPE", DESCRIPTOR_CLASS);
-				break;
-
-			case 'Z':
-				mv.visitFieldInsn(GETSTATIC, BINARY_NAME_BOOLEAN, "TYPE", DESCRIPTOR_CLASS);
-				break;
-
-			case 'C':
-				mv.visitFieldInsn(GETSTATIC, BINARY_NAME_CHARACTER, "TYPE", DESCRIPTOR_CLASS);
-				break;
-
-			case 'B':
-				mv.visitFieldInsn(GETSTATIC, BINARY_NAME_BYTE, "TYPE", DESCRIPTOR_CLASS);
-				break;
-
-			case 'S':
-				mv.visitFieldInsn(GETSTATIC, BINARY_NAME_SHORT, "TYPE", DESCRIPTOR_CLASS);
-				break;
-
-			case 'F':
-				mv.visitFieldInsn(GETSTATIC, BINARY_NAME_FLOAT, "TYPE", DESCRIPTOR_CLASS);
-				break;
-
-			case 'D':
-				mv.visitFieldInsn(GETSTATIC, BINARY_NAME_DOUBLE, "TYPE", DESCRIPTOR_CLASS);
-				break;
-
-			default:
-				mv.visitLdcInsn(type);
-				break;
+			case 'V' -> mv.visitFieldInsn(GETSTATIC, BINARY_NAME_VOID, "TYPE", DESCRIPTOR_CLASS);
+			case 'I' -> mv.visitFieldInsn(GETSTATIC, BINARY_NAME_INTEGER, "TYPE", DESCRIPTOR_CLASS);
+			case 'J' -> mv.visitFieldInsn(GETSTATIC, BINARY_NAME_LONG, "TYPE", DESCRIPTOR_CLASS);
+			case 'Z' -> mv.visitFieldInsn(GETSTATIC, BINARY_NAME_BOOLEAN, "TYPE", DESCRIPTOR_CLASS);
+			case 'C' -> mv.visitFieldInsn(GETSTATIC, BINARY_NAME_CHARACTER, "TYPE", DESCRIPTOR_CLASS);
+			case 'B' -> mv.visitFieldInsn(GETSTATIC, BINARY_NAME_BYTE, "TYPE", DESCRIPTOR_CLASS);
+			case 'S' -> mv.visitFieldInsn(GETSTATIC, BINARY_NAME_SHORT, "TYPE", DESCRIPTOR_CLASS);
+			case 'F' -> mv.visitFieldInsn(GETSTATIC, BINARY_NAME_FLOAT, "TYPE", DESCRIPTOR_CLASS);
+			case 'D' -> mv.visitFieldInsn(GETSTATIC, BINARY_NAME_DOUBLE, "TYPE", DESCRIPTOR_CLASS);
+			case '[', 'L' -> mv.visitLdcInsn(type);
 		}
 	}
 
@@ -291,51 +170,40 @@ interface AsmUtil {
 		int offset = info.argumentOffset(index);
 		Type type = info.argumentTypes()[index];
 		switch (type.getDescriptor().charAt(0)) {
-			case 'V':
-				break;
-
-			case 'I':
+			case 'V' -> {}
+			case 'I' -> {
 				mv.visitVarInsn(ILOAD, offset);
 				valueOfInteger(mv);
-				break;
-
-			case 'J':
+			}
+			case 'J' -> {
 				mv.visitVarInsn(LLOAD, offset);
 				valueOfLong(mv);
-				break;
-
-			case 'Z':
+			}
+			case 'Z' -> {
 				mv.visitVarInsn(ILOAD, offset);
 				valueOfBoolean(mv);
-				break;
-
-			case 'C':
+			}
+			case 'C' -> {
 				mv.visitVarInsn(ILOAD, offset);
 				valueOfCharacter(mv);
-				break;
-
-			case 'B':
+			}
+			case 'B' -> {
 				mv.visitVarInsn(ILOAD, offset);
 				valueOfByte(mv);
-				break;
-
-			case 'S':
+			}
+			case 'S' -> {
 				mv.visitVarInsn(ILOAD, offset);
 				valueOfShort(mv);
-				break;
-
-			case 'F':
+			}
+			case 'F' -> {
 				mv.visitVarInsn(FLOAD, offset);
 				valueOfFloat(mv);
-				break;
-
-			case 'D':
+			}
+			case 'D' -> {
 				mv.visitVarInsn(DLOAD, offset);
 				valueOfDouble(mv);
-				break;
-
-			default:
-				mv.visitVarInsn(ALOAD, offset);
+			}
+			case '[', 'L' -> mv.visitVarInsn(ALOAD, offset);
 		}
 	}
 
@@ -352,32 +220,16 @@ interface AsmUtil {
 	}
 
 	static int getArgumentIndex(int opcode, int operand) {
-		switch (opcode) {
-			case ICONST_0:
-				return 0;
-
-			case ICONST_1:
-				return 1;
-
-			case ICONST_2:
-				return 2;
-
-			case ICONST_3:
-				return 3;
-
-			case ICONST_4:
-				return 4;
-
-			case ICONST_5:
-				return 5;
-
-			case BIPUSH:
-			case SIPUSH:
-				return operand;
-
-			default:
-				throw new ProxyException("Unexpected previous instruction used for setting argument index.");
-		}
+		return switch (opcode) {
+			case ICONST_0 -> 0;
+			case ICONST_1 -> 1;
+			case ICONST_2 -> 2;
+			case ICONST_3 -> 3;
+			case ICONST_4 -> 4;
+			case ICONST_5 -> 5;
+			case BIPUSH, SIPUSH -> operand;
+			default -> throw new ProxyException("Unexpected previous instruction used for setting argument index.");
+		};
 	}
 
 	static void storeArgumentObject(MethodVisitor mv, MethodInfo info, int index) {
@@ -389,51 +241,40 @@ interface AsmUtil {
 
 	static void storeValue(MethodVisitor mv, Type type, int offset) {
 		switch (type.getDescriptor().charAt(0)) {
-			case 'V':
-				break;
-
-			case 'I':
+			case 'V' -> {}
+			case 'I' -> {
 				intValue(mv);
 				mv.visitVarInsn(ISTORE, offset);
-				break;
-
-			case 'J':
+			}
+			case 'J' -> {
 				longValue(mv);
 				mv.visitVarInsn(LSTORE, offset);
-				break;
-
-			case 'Z':
+			}
+			case 'Z' -> {
 				booleanValue(mv);
 				mv.visitVarInsn(ISTORE, offset);
-				break;
-
-			case 'C':
+			}
+			case 'C' -> {
 				charValue(mv);
 				mv.visitVarInsn(ISTORE, offset);
-				break;
-
-			case 'B':
+			}
+			case 'B' -> {
 				byteValue(mv);
 				mv.visitVarInsn(ISTORE, offset);
-				break;
-
-			case 'S':
+			}
+			case 'S' -> {
 				shortValue(mv);
 				mv.visitVarInsn(ISTORE, offset);
-				break;
-
-			case 'F':
+			}
+			case 'F' -> {
 				floatValue(mv);
 				mv.visitVarInsn(FSTORE, offset);
-				break;
-
-			case 'D':
+			}
+			case 'D' -> {
 				doubleValue(mv);
 				mv.visitVarInsn(DSTORE, offset);
-				break;
-
-			default:
-				mv.visitVarInsn(ASTORE, offset);
+			}
+			case '[', 'L' -> mv.visitVarInsn(ASTORE, offset);
 		}
 	}
 
@@ -441,64 +282,26 @@ interface AsmUtil {
 		Type type = info.argumentTypes()[index];
 		int offset = info.argumentOffset(index);
 		switch (type.getDescriptor().charAt(0)) {
-			case 'V':
-				break;
-
-			case 'I':
-			case 'Z':
-			case 'C':
-			case 'B':
-			case 'S':
-				mv.visitVarInsn(ILOAD, offset);
-				break;
-
-			case 'J':
-				mv.visitVarInsn(LLOAD, offset);
-				break;
-
-			case 'F':
-				mv.visitVarInsn(FLOAD, offset);
-				break;
-
-			case 'D':
-				mv.visitVarInsn(DLOAD, offset);
-				break;
-
-			default:
-				mv.visitVarInsn(ALOAD, offset);
+			case 'V' -> {}
+			case 'I', 'Z', 'C', 'B', 'S' -> mv.visitVarInsn(ILOAD, offset);
+			case 'J' -> mv.visitVarInsn(LLOAD, offset);
+			case 'F' -> mv.visitVarInsn(FLOAD, offset);
+			case 'D' -> mv.visitVarInsn(DLOAD, offset);
+			case '[', 'L' -> mv.visitVarInsn(ALOAD, offset);
 		}
 	}
 
 	static void visitReturn(MethodVisitor mv, Type type) {
 		switch (type.getDescriptor().charAt(0)) {
-			case 'V':
-				mv.visitInsn(RETURN);
-				break;
-
-			case 'I':
-			case 'Z':
-			case 'C':
-			case 'B':
-			case 'S':
-				mv.visitInsn(IRETURN);
-				break;
-
-			case 'J':
-				mv.visitInsn(LRETURN);
-				break;
-
-			case 'F':
-				mv.visitInsn(FRETURN);
-				break;
-
-			case 'D':
-				mv.visitInsn(DRETURN);
-				break;
-
-			default:
+			case 'V' -> mv.visitInsn(RETURN);
+			case 'I', 'Z', 'C', 'B', 'S' -> mv.visitInsn(IRETURN);
+			case 'J' -> mv.visitInsn(LRETURN);
+			case 'F' -> mv.visitInsn(FRETURN);
+			case 'D' -> mv.visitInsn(DRETURN);
+			case '[', 'L' -> {
 				mv.visitTypeInsn(CHECKCAST, type.getInternalName());
 				mv.visitInsn(ARETURN);
-				break;
+			}
 		}
 	}
 }

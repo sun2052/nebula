@@ -1,12 +1,9 @@
 Nebula Web
 ==========
 
-Micro Web Framework
+Minimal Web Framework based on [Project Loom](https://wiki.openjdk.java.net/display/loom/Main)
 
 * HTTP/1.1
-* HTTP/2
-* WebSocket
-* TLS
 
 
 Configuration

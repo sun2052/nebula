@@ -78,13 +78,13 @@ public class ProxyBuilder extends ClassVisitor {
 
 			@Override
 			public void visitEnd() {
-				MethodInfo info = new MethodInfo(name, descriptor, annotationTypes.toArray(new String[0]));
+				MethodInfo info = MethodInfo.of(name, descriptor, annotationTypes.toArray(new String[0]));
 
 				List<Class<? extends Advice>> list = new ArrayList<>(aspects.size());
 				for (Aspect aspect : aspects) {
-					if (aspect.pointcut.apply(info)) {
+					if (aspect.pointcut().apply(info)) {
 						if ((access & ACC_PRIVATE) == 0 && (access & ACC_FINAL) == 0 && (access & ACC_STATIC) == 0 && (access & ACC_ABSTRACT) == 0) {
-							list.add(aspect.advice);
+							list.add(aspect.advice());
 						} else {
 							throw new IllegalArgumentException("Only non-final and non-private instance methods are allowed: " + name);
 						}
@@ -143,7 +143,7 @@ public class ProxyBuilder extends ClassVisitor {
 											public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
 												if (opcode == INVOKESTATIC && owner.equals(PROXY_TARGET_TYPE)) {
 													switch (name) {
-														case "proceed":
+														case "proceed" -> {
 															mv.visitVarInsn(ALOAD, 0);
 															for (int j = 0; j < info.argumentsCount(); j++) {
 																AsmUtil.loadArgument(mv, info, j);
@@ -154,40 +154,21 @@ public class ProxyBuilder extends ClassVisitor {
 															} else {
 																mv.visitMethodInsn(INVOKEVIRTUAL, typeName, nextMethodName, nextDescriptor, false);
 															}
-															break;
-
-														case "name":
-															mv.visitLdcInsn(info.name());
-															break;
-
-														case "argumentsCount":
-															AsmUtil.pushInt(mv, info.argumentsCount());
-															break;
-
-														case "argumentTypes":
-															AsmUtil.loadArgumentClasses(mv, info);
-															break;
-
-														case "returnType":
-															AsmUtil.loadClass(mv, info.returnType());
-															break;
-
-														case "argument":
+														}
+														case "name" -> mv.visitLdcInsn(info.name());
+														case "argumentsCount" -> AsmUtil.pushInt(mv, info.argumentsCount());
+														case "argumentTypes" -> AsmUtil.loadArgumentClasses(mv, info);
+														case "returnType" -> AsmUtil.loadClass(mv, info.returnType());
+														case "argument" -> {
 															mv.visitInsn(POP);
 															AsmUtil.loadArgumentObject(mv, info, AsmUtil.getArgumentIndex(previousOpcode, previousOperand));
-															break;
-
-														case "arguments":
-															AsmUtil.loadArgumentObjects(mv, info);
-															break;
-
-														case "setArgument":
+														}
+														case "arguments" -> AsmUtil.loadArgumentObjects(mv, info);
+														case "setArgument" -> {
 															mv.visitInsn(POP);
 															AsmUtil.storeArgumentObject(mv, info, AsmUtil.getArgumentIndex(previousOpcode, previousOperand));
-															break;
-
-														default:
-															throw new ProxyException("Unsupported ProxyTarget method: " + name);
+														}
+														default -> throw new ProxyException("Unsupported ProxyTarget method: " + name);
 													}
 												} else {
 													super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);

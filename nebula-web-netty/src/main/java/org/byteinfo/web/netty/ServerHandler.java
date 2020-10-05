@@ -1,4 +1,4 @@
-package org.byteinfo.web;
+package org.byteinfo.web.netty;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -46,9 +46,8 @@ public class ServerHandler extends SimpleChannelInboundHandler<Object> {
 
 	@Override
 	public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
-		if (msg instanceof FullHttpRequest) {
+		if (msg instanceof FullHttpRequest req) {
 			long start = System.currentTimeMillis();
-			FullHttpRequest req = (FullHttpRequest) msg;
 			ctx.channel().attr(PATH).set(req.method().name() + " " + req.uri());
 			HttpContext context = new HttpContext(ctx, req, HTTP_BUFFER_SIZE);
 			try {

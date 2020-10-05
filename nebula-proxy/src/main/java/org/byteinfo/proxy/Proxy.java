@@ -29,7 +29,7 @@ public class Proxy<T> {
 
 	public Proxy<T> with(Aspect... aspects) {
 		for (Aspect aspect : aspects) {
-			Class<?> advice = aspect.advice;
+			Class<?> advice = aspect.advice();
 			if (advice.getDeclaredFields().length > 0) {
 				throw new IllegalArgumentException("Fields in advice is not supported.");
 			}

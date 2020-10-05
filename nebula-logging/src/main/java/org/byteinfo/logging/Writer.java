@@ -55,7 +55,7 @@ public interface Writer {
 		builder.append(stackFrame.getClassName());
 		builder.append('.');
 		builder.append(stackFrame.getMethodName());
-		builder.append("@");
+		builder.append("#");
 		builder.append(stackFrame.getLineNumber());
 
 		builder.append(": ");
@@ -73,7 +73,7 @@ public interface Writer {
 			builder.append(System.lineSeparator());
 			StringWriter sw = new StringWriter(512);
 			throwable.printStackTrace(new PrintWriter(sw));
-			builder.append(sw.toString());
+			builder.append(sw);
 		}
 
 		return builder.toString();

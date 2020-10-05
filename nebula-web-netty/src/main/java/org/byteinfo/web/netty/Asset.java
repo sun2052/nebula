@@ -1,4 +1,4 @@
-package org.byteinfo.web;
+package org.byteinfo.web.netty;
 
 import org.byteinfo.util.codec.ByteUtil;
 

@@ -56,6 +56,27 @@ public interface JDBC {
 	}
 
 	/**
+	 *  Query the matched count by the given SQL and a list of arguments.
+	 *
+	 * @param connection the JDBC Connection
+	 * @param sql the SQL statement to execute
+	 * @param args arguments to bind to the query
+	 * @return the matched count
+	 * @throws SQLException if an error occurs
+	 */
+	static int count(Connection connection, String sql, Object... args) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement(sql)) {
+			int index = 1;
+			for (Object arg : args) {
+				ps.setObject(index++, arg);
+			}
+			ResultSet rs = ps.executeQuery();
+			rs.next();
+			return rs.getInt(1);
+		}
+	}
+
+	/**
 	 * Issue a single SQL insert operation via a prepared statement, binding the given arguments.
 	 *
 	 * @param connection the JDBC Connection
