@@ -15,7 +15,6 @@
 		<module>nebula-logging</module>
 		<module>nebula-proxy</module>
 		<module>nebula-web</module>
-		<module>nebula-web-netty</module>
 	</modules>
 
 	<properties>

@@ -8,7 +8,6 @@
 		<groupId>org.byteinfo</groupId>
 		<artifactId>nebula-parent</artifactId>
 		<version>1.0-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath>
 	</parent>
 
 	<artifactId>nebula-utils</artifactId>

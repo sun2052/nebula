@@ -32,11 +32,6 @@ Lightweight [ASM-Based](https://asm.ow2.io/) Runtime Proxy Generator
 Minimal Web Framework based on [Project Loom](https://wiki.openjdk.java.net/display/loom/Main) (HTTP/1.1)
 
 
-### [Nebula Web Netty](nebula-web-netty)
-
-Micro Web Framework based on [Netty](https://github.com/netty/netty) (HTTP/2 & WebSocket over TLS)
-
-
 Build & Install
 ---------------
 

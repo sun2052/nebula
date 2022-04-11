@@ -123,7 +123,7 @@ public class Server extends Context {
 		for (CheckedConsumer<Server> handler : onStartHandlers) {
 			handler.accept(this);
 		}
-		Log.info("Server started: listening {}", port);
+		Log.info("Server started: listening http://{}:{}", Config.get("http.bindAddr"), port);
 		return this;
 	}
 
