@@ -1,6 +1,6 @@
 package org.byteinfo.logging;
 
-import org.byteinfo.util.codec.StringUtil;
+import org.byteinfo.util.text.StringUtil;
 import org.byteinfo.util.reflect.StackUtil;
 
 import java.io.PrintWriter;
@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.function.Supplier;
 
-public interface Writer {
+public interface Writer extends AutoCloseable {
 	/**
 	 * Outputs a given message.
 	 *
@@ -55,7 +55,7 @@ public interface Writer {
 		builder.append(stackFrame.getClassName());
 		builder.append('.');
 		builder.append(stackFrame.getMethodName());
-		builder.append("#");
+		builder.append("()@");
 		builder.append(stackFrame.getLineNumber());
 
 		builder.append(": ");
@@ -71,7 +71,7 @@ public interface Writer {
 		// Format throwable, if any
 		if (throwable != null) {
 			builder.append(System.lineSeparator());
-			StringWriter sw = new StringWriter(512);
+			StringWriter sw = new StringWriter(1024);
 			throwable.printStackTrace(new PrintWriter(sw));
 			builder.append(sw);
 		}

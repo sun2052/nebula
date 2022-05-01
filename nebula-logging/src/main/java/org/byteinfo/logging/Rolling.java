@@ -18,7 +18,7 @@ public class Rolling {
 	public static final Rolling NONE = new Rolling(null, null) {
 		@Override
 		public String getSuffix(long time) {
-			return "";
+			return ".log";
 		}
 
 		@Override

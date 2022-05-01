@@ -81,7 +81,7 @@ public class Cookie {
 		}
 
 		if (maxAge != null) {
-			buf.append("; maxage=").append(maxAge).append('s');
+			buf.append("; max-age=").append(maxAge);
 		}
 
 		if (secure) {

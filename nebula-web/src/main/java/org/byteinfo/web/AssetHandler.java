@@ -1,7 +1,6 @@
 package org.byteinfo.web;
 
 import org.byteinfo.util.io.IOUtil;
-import org.byteinfo.util.misc.Config;
 
 import java.io.IOException;
 import java.net.URL;
@@ -13,23 +12,24 @@ public class AssetHandler implements Handler {
 	private final String classRoot;
 
 	public AssetHandler() {
-		String path = Config.get("asset.pathRoot");
+		String path = AppConfig.get().get("asset.pathRoot");
 		if (path == null) {
 			pathRoot = null;
 		} else {
 			pathRoot = Path.of(path);
 		}
-		classRoot = Config.get("asset.classRoot");
+		classRoot = AppConfig.get().get("asset.classRoot");
 	}
 
 	@Override
 	public Object handle(HttpContext context) throws IOException {
 		String path = context.path();
+		String type = ContentType.byName(path);
 
 		if (pathRoot != null) {
 			Path file = pathRoot.resolve(path.substring(1));
 			if (Files.exists(file) && Files.isRegularFile(file)) {
-				return new Result(file.toUri().toURL(), ContentType.byName(path));
+				return Result.of(file.toUri().toURL()).setType(type);
 			}
 		}
 
@@ -37,6 +37,6 @@ public class AssetHandler implements Handler {
 		if (url == null) {
 			throw new WebException(StatusCode.NOT_FOUND, "Resource not found: " + path);
 		}
-		return new Result(url, ContentType.byName(path));
+		return Result.of(url).setType(type);
 	}
 }

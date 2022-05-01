@@ -1,8 +1,7 @@
 package org.byteinfo.web;
 
-import org.byteinfo.util.codec.RandomUtil;
+import org.byteinfo.util.text.RandomUtil;
 import org.byteinfo.util.io.IOUtil;
-import org.byteinfo.util.misc.Config;
 import org.byteinfo.util.time.WheelTimer;
 
 import java.io.ByteArrayInputStream;
@@ -22,15 +21,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class HttpContext {
-	public static final Map<String, Session> SESSIONS = new ConcurrentHashMap<>(Config.getInt("session.capacity"));
-	public static final int SESSION_TIMEOUT = Config.getInt("session.timeout") * 60;
-	public static final int SESSION_ID_LENGTH = Config.getInt("session.length");
-	public static final String SESSION_COOKIE_NAME = Config.get("session.name");
-	public static final String CONTEXT_PATH = Config.get("http.contextPath");
+	public static final AtomicLong ID_GENERATOR = new AtomicLong();
+	public static final Map<String, Session> SESSIONS = new ConcurrentHashMap<>(AppConfig.get().getInt("session.capacity"));
+	public static final int SESSION_TIMEOUT = AppConfig.get().getInt("session.timeout") * 60;
+	public static final int SESSION_ID_LENGTH = AppConfig.get().getInt("session.length");
+	public static final String SESSION_COOKIE_NAME = AppConfig.get().get("session.name");
+	public static final String CONTEXT_PATH = AppConfig.get().get("http.contextPath");
 
+	private final long id;
 	private final Socket socket;
 	private final OutputStream out;
 	private final Request request;
@@ -43,10 +45,11 @@ public class HttpContext {
 	private String responseType = ContentType.HTML;
 	private Headers responseHeaders = new Headers();
 	private Map<String, Cookie> responseCookies = new LinkedHashMap<>();
-	private long responseLength = -1;
-	private boolean committed = false;
+	private long responseLength;
+	private boolean committed;
 
 	public HttpContext(Socket socket, InputStream in, OutputStream out) throws IOException {
+		this.id = ID_GENERATOR.incrementAndGet();
 		this.socket = socket;
 		this.out = out;
 		request = HttpCodec.parseRequest(in);
@@ -55,6 +58,10 @@ public class HttpContext {
 
 
 	/* ---------------- Request -------------- */
+
+	public long id() {
+		return id;
+	}
 
 	public String method() {
 		return request.method();
@@ -80,16 +87,16 @@ public class HttpContext {
 		return request.headers();
 	}
 
-	public Map<String, Cookie> cookies()   {
+	public Map<String, Cookie> cookies() {
 		if (cookies == null) {
-			cookies = HttpCodec.decodeCookies(request.headers());
+			cookies = HttpCodec.parseCookies(request.headers());
 		}
 		return cookies;
 	}
 
 	public Map<String, List<String>> params() throws IOException {
 		if (params == null) {
-			params = HttpCodec.decodeParams(request);
+			params = HttpCodec.parseParams(request);
 		}
 		return params;
 	}
@@ -107,7 +114,8 @@ public class HttpContext {
 		String value = param(name);
 		return value == null ? defaultValue : value;
 	}
-	public int paramAsInt(String name)   {
+
+	public int paramAsInt(String name) {
 		try {
 			return Integer.parseInt(param(name));
 		} catch (Exception e) {
@@ -123,7 +131,7 @@ public class HttpContext {
 		}
 	}
 
-	public long paramAsLong(String name)   {
+	public long paramAsLong(String name) {
 		try {
 			return Long.parseLong(param(name));
 		} catch (Exception e) {
@@ -155,15 +163,15 @@ public class HttpContext {
 		}
 	}
 
-	public <T> T param(Class<T> clazz)   {
+	public <T> T param(Class<T> clazz) {
 		return param(clazz, false);
 	}
 
-	public <T> T ifParam(Class<T> clazz)   {
+	public <T> T ifParam(Class<T> clazz) {
 		return param(clazz, true);
 	}
 
-	public <T> T param(Class<T> clazz, boolean optional)   {
+	public <T> T param(Class<T> clazz, boolean optional) {
 		try {
 			Object obj = clazz.getDeclaredConstructor().newInstance();
 			for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
@@ -232,7 +240,7 @@ public class HttpContext {
 		return request.length();
 	}
 
-	public Session session(boolean create)   {
+	public Session session(boolean create) {
 		if (session != null) {
 			return session;
 		}
@@ -269,11 +277,11 @@ public class HttpContext {
 		return null;
 	}
 
-	public Session session()   {
+	public Session session() {
 		return session(true);
 	}
 
-	public Session ifSession()   {
+	public Session ifSession() {
 		return session(false);
 	}
 
@@ -286,7 +294,10 @@ public class HttpContext {
 		if (host == null) {
 			host = request.headers().get(HeaderName.HOST);
 		}
-		return host;
+		if (host != null) {
+			return host.split(":", 2)[0];
+		}
+		return null;
 	}
 
 	public int port() {
@@ -299,9 +310,10 @@ public class HttpContext {
 	}
 
 	public String remoteAddress() {
+		// X-Forwarded-For: <client>, <proxy1>, <proxy2>
 		String address = request.headers().get(HeaderName.FORWARDED_FOR);
 		if (address != null) {
-			return address.split(":")[0];
+			return address.split(",", 2)[0];
 		} else {
 			return ((InetSocketAddress) socket.getRemoteSocketAddress()).getAddress().getHostAddress();
 		}
@@ -322,8 +334,8 @@ public class HttpContext {
 		return responseStatus;
 	}
 
-	public HttpContext setResponseStatus(int responseStatus) {
-		this.responseStatus = responseStatus;
+	public HttpContext setResponseStatus(int status) {
+		this.responseStatus = status;
 		return this;
 	}
 
@@ -361,7 +373,7 @@ public class HttpContext {
 		return this;
 	}
 
-	public long getResponseLength() {
+	public long responseLength() {
 		return responseLength;
 	}
 
@@ -390,15 +402,20 @@ public class HttpContext {
 			throw new IllegalStateException("Response has already been committed.");
 		}
 
+		// parse result
 		InputStream in;
 		if (result == null) {
 			in = null;
 		} else if (result instanceof Result data) {
+			responseStatus = data.status();
 			responseType = data.type();
 			responseLength = data.length();
 			in = data.stream();
+			if (data.eTag() != null) {
+				responseHeaders.set(HeaderName.ETAG, data.eTag());
+			}
 		} else if (result instanceof String data) {
-			byte[] buffer = data.getBytes(StandardCharsets.UTF_8);
+			byte[] buffer = data.getBytes();
 			responseLength = buffer.length;
 			in = new ByteArrayInputStream(buffer);
 		} else if (result instanceof byte[] data) {
@@ -406,16 +423,31 @@ public class HttpContext {
 			in = new ByteArrayInputStream(data);
 		} else if (result instanceof InputStream data) {
 			in = data;
-			if (responseLength < 0) {
-				throw new IllegalArgumentException("Response Length has not been set.");
-			}
 		} else {
 			throw new IllegalArgumentException("Unsupported result: " + result);
 		}
 
-		responseHeaders.set(HeaderName.CONTENT_TYPE, responseType);
-		HttpCodec.writeResponse(out, responseStatus, responseHeaders, responseCookies.values(), in, responseLength);
-		committed = true;
+		// handle conditional request
+		String ifNoneMatch = headers().get(HeaderName.IF_NONE_MATCH);
+		if (ifNoneMatch != null) {
+			String eTag = responseHeaders.get(HeaderName.ETAG);
+			if (eTag != null && (ifNoneMatch.equals(eTag) || ifNoneMatch.contains(eTag))) {
+				responseStatus = StatusCode.NOT_MODIFIED;
+				responseLength = 0;
+				HttpCodec.send(out, responseStatus);
+				committed = true;
+			}
+		}
+
+		// send response
+		if (!committed) {
+			if (responseLength > 0) {
+				responseHeaders.set(HeaderName.CONTENT_TYPE, responseType);
+			}
+			HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), in, responseLength);
+			committed = true;
+		}
+
 		IOUtil.closeQuietly(in);
 	}
 }

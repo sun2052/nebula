@@ -1,14 +1,12 @@
 package org.byteinfo.logging;
 
-import org.byteinfo.util.io.IOUtil;
+import org.byteinfo.util.misc.Config;
 
-import java.io.Reader;
 import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.function.Supplier;
 
 public class Log {
@@ -18,31 +16,26 @@ public class Log {
 
 	static {
 		try {
-			Properties props = new Properties();
-			try (Reader in = IOUtil.resourceReader("org/byteinfo/logging/logging.properties")) {
-				props.load(in);
-			}
-			try (Reader in = IOUtil.resourceReader("logging.properties")) {
-				if (in != null) {
-					props.load(in);
-				}
-			}
+			Config config = new Config();
+			config.load("class:org/byteinfo/logging/logging.properties");
+			config.loadIf("class:logging.properties");
+			config.load(System.getProperties());
 
 			Level minLevel = Level.OFF;
 			List<Writer> writers = new ArrayList<>();
-			for (String name : props.stringPropertyNames()) {
-				if (!name.contains(".")) {
-					Level level = Level.valueOf(props.getProperty(name + ".level"));
+			for (String name : config.getPropertyNames()) {
+				if (name.startsWith("writer") && !name.contains(".")) {
+					Level level = Level.valueOf(config.get(name + ".level"));
 					if (level.ordinal() < minLevel.ordinal()) {
 						minLevel = level;
 					}
-					String type = props.getProperty(name);
+					String type = config.get(name);
 					if ("console".equals(type)) {
 						writers.add(new ConsoleWriter(level));
 					} else if ("file".equals(type)) {
-						Path target = Path.of(props.getProperty(name + ".path"));
-						Rolling rolling = (Rolling) Rolling.class.getDeclaredField(props.getProperty(name + ".rolling")).get(null);
-						int backups = Integer.parseInt(props.getProperty(name + ".backups"));
+						Path target = Path.of(config.get(name + ".path"));
+						Rolling rolling = (Rolling) Rolling.class.getDeclaredField(config.get(name + ".rolling")).get(null);
+						int backups = Integer.parseInt(config.get(name + ".backups"));
 						writers.add(new FileWriter(level, target, rolling, backups));
 					} else {
 						throw new LogException("Unsupported Writer type: " + type);

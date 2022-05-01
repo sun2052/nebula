@@ -9,11 +9,14 @@ Configuration
 
 Configurations are located in the classpath.
 ```
-# default config
+# default config: writer* = <value>
 org/byteinfo/logging/logging.properties
 
 # custom config
 logging.properties
+
+# system properties
+java -Dwriter.level=INFO -jar app.jar
 ```
 
 

@@ -18,7 +18,7 @@ org/byteinfo/web/application.properties
 application.properties
 
 # system properties
-java -Dhttp.access=/opt/log/access.log -jar app.jar
+java -Dhttp.port=80 -jar app.jar
 ```
 
 
@@ -36,19 +36,9 @@ public class MainController {
 	}
 }
 
-// WebSocket Handler 
-@Path("/ws")
-public class MyWebSocketHandler implements WebSocketHandler {
-	@Override
-	public void onTextMessage(WebSocket ws, String data) {
-		ws.sendText("Received: " + data);
-	}
-}
-
 // Bootstrap
 new Server()
 .handler(MainController.class)
-.websocket(MyWebSocketHandler.class)
 .start();
 ```
 
@@ -56,11 +46,5 @@ new Server()
 ```java
 new Server()
 .get("/", ctx -> "Hello, World!")
-.websocket("/ws", new WebSocketHandler() {
-    @Override
-    public void onTextMessage(WebSocket ws, String data) {
-        ws.sendText("Received: " + data);
-    }
-})
 .start();
 ```

@@ -15,11 +15,9 @@ import java.util.regex.Pattern;
  * Config
  */
 public class Config {
-	private static final Properties PROPERTIES = new Properties();
 	private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
-	private Config() {
-	}
+	private final Properties properties = new Properties();
 
 	/**
 	 * Load configuration
@@ -27,21 +25,24 @@ public class Config {
 	 * @param resource configuration
 	 * @throws IOException exception
 	 */
-	public static void load(String resource) throws IOException {
-		PROPERTIES.load(IOUtil.reader(resource));
+	public void load(String resource) throws IOException {
+		properties.load(IOUtil.reader(resource));
 	}
 
 	/**
 	 * Load configuration if exist
 	 *
 	 * @param resource configuration
+	 * @return if loaded
 	 * @throws IOException exception
 	 */
-	public static void loadIf(String resource) throws IOException {
+	public boolean loadIf(String resource) throws IOException {
 		Reader in = IOUtil.reader(resource);
 		if (in != null) {
-			PROPERTIES.load(in);
+			properties.load(in);
+			return true;
 		}
+		return false;
 	}
 
 	/**
@@ -50,9 +51,9 @@ public class Config {
 	 * @param reader configuration
 	 * @throws IOException exception
 	 */
-	public static void load(Reader reader) throws IOException {
-		try (Reader in = reader) {
-			PROPERTIES.load(in);
+	public void load(Reader reader) throws IOException {
+		try (reader) {
+			properties.load(reader);
 		}
 	}
 
@@ -61,19 +62,19 @@ public class Config {
 	 *
 	 * @param config configuration
 	 */
-	public static void load(Map<?, ?> config) {
-		config.forEach((key, value) -> PROPERTIES.put(String.valueOf(key), String.valueOf(value)));
+	public void load(Map<?, ?> config) {
+		config.forEach((key, value) -> properties.put(String.valueOf(key), String.valueOf(value)));
 	}
 
 	/**
 	 * Interpolate variables in configuration
 	 */
-	public static void interpolate() {
-		PROPERTIES.forEach((name, value) -> Config.interpolateEntry((String) name, (String) value, new LinkedHashSet<>()));
+	public void interpolate() {
+		properties.forEach((name, value) -> interpolateEntry((String) name, (String) value, new LinkedHashSet<>()));
 	}
 
 	// Interpolate variables recursively
-	private static String interpolateEntry(String key, String value, Set<String> chain) {
+	private String interpolateEntry(String key, String value, Set<String> chain) {
 		Matcher matcher = VARIABLE_PATTERN.matcher(value);
 
 		while (matcher.find()) {
@@ -84,16 +85,16 @@ public class Config {
 			if (chain.contains(variable)) {
 				StringBuilder chainString = new StringBuilder();
 				chain.forEach(name -> chainString.append(name).append(" -> "));
-				throw new IllegalArgumentException("Circular Reference Detected: " + chainString.append(variable).toString());
+				throw new IllegalArgumentException("Circular Reference Detected: " + chainString.append(variable));
 			}
 
-			String target = PROPERTIES.getProperty(variable);
+			String target = properties.getProperty(variable);
 			if (target == null) {
 				throw new IllegalArgumentException("Variable[" + variable + "] Not Found.");
 			}
 
 			value = value.replace("${" + variable + "}", interpolateEntry(variable, target, chain));
-			PROPERTIES.put(key, value);
+			properties.put(key, value);
 		}
 
 		chain.clear();
@@ -107,8 +108,8 @@ public class Config {
 	 * @param key config key
 	 * @return target or null
 	 */
-	public static String get(String key) {
-		return PROPERTIES.getProperty(key);
+	public String get(String key) {
+		return properties.getProperty(key);
 	}
 
 	/**
@@ -118,8 +119,8 @@ public class Config {
 	 * @param defaultValue default
 	 * @return target or default
 	 */
-	public static String get(String key, String defaultValue) {
-		return PROPERTIES.getProperty(key, defaultValue);
+	public String get(String key, String defaultValue) {
+		return properties.getProperty(key, defaultValue);
 	}
 
 	/**
@@ -129,7 +130,7 @@ public class Config {
 	 * @return target
 	 * @throws NumberFormatException if value is not parsable
 	 */
-	public static int getInt(String key) {
+	public int getInt(String key) {
 		return Integer.parseInt(get(key));
 	}
 
@@ -140,7 +141,7 @@ public class Config {
 	 * @param defaultValue default
 	 * @return target or default
 	 */
-	public static int getInt(String key, int defaultValue) {
+	public int getInt(String key, int defaultValue) {
 		String value = get(key);
 		if (value != null) {
 			try {
@@ -158,7 +159,7 @@ public class Config {
 	 * @param key config key
 	 * @return target
 	 */
-	public static long getLong(String key) {
+	public long getLong(String key) {
 		return Long.parseLong(get(key));
 	}
 
@@ -169,7 +170,7 @@ public class Config {
 	 * @return target
 	 * @throws NumberFormatException if value is not parsable
 	 */
-	public static long getLong(String key, long defaultValue) {
+	public long getLong(String key, long defaultValue) {
 		String value = get(key);
 		if (value != null) {
 			try {
@@ -189,7 +190,7 @@ public class Config {
 	 * @throws NullPointerException if value is null
 	 * @throws NumberFormatException if value is not parsable
 	 */
-	public static double getDouble(String key) {
+	public double getDouble(String key) {
 		return Double.parseDouble(get(key));
 	}
 
@@ -199,7 +200,7 @@ public class Config {
 	 * @param key config key
 	 * @return target or default
 	 */
-	public static double getDouble(String key, double defaultValue) {
+	public double getDouble(String key, double defaultValue) {
 		String value = get(key);
 		if (value != null) {
 			try {
@@ -217,7 +218,16 @@ public class Config {
 	 * @param key config key
 	 * @return target
 	 */
-	public static boolean getBoolean(String key) {
+	public boolean getBoolean(String key) {
 		return Boolean.parseBoolean(get(key));
+	}
+
+	/**
+	 * Get all property names.
+	 *
+	 * @return unmodifiable set of property names
+	 */
+	public Set<String> getPropertyNames() {
+		return properties.stringPropertyNames();
 	}
 }

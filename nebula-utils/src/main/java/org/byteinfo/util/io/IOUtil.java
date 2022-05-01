@@ -10,7 +10,6 @@ import java.io.Reader;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -21,7 +20,7 @@ import java.util.stream.Collectors;
  */
 public interface IOUtil {
 	/**
-	 * Gets a url for accessing the specified resource from classpath.
+	 * Gets an url for accessing the specified resource from classpath.
 	 *
 	 * @param resource resource name
 	 * @return url or null if not found
@@ -49,7 +48,7 @@ public interface IOUtil {
 	}
 
 	/**
-	 * Gets a url for accessing the specified resource from either classpath or file system.
+	 * Gets an url for accessing the specified resource from either classpath or file system.
 	 *
 	 * @param resource resource name, use prefix "class:" for classpath, use prefix "file:" for file system
 	 * @return url or null if not found
@@ -69,7 +68,7 @@ public interface IOUtil {
 	}
 
 	/**
-	 * Gets a url for accessing the specified resource from classpath.
+	 * Gets an url for accessing the specified resource from classpath.
 	 *
 	 * @param resource resource name
 	 * @return url or null if not found
@@ -83,7 +82,7 @@ public interface IOUtil {
 	}
 
 	/**
-	 * Gets a url for accessing the specified resource from file system.
+	 * Gets an url for accessing the specified resource from file system.
 	 *
 	 * @param resource resource name
 	 * @return url or null if not found
@@ -134,7 +133,7 @@ public interface IOUtil {
 	 * @return url or null if not found
 	 */
 	static Reader fileReader(String resource) throws IOException {
-		return Files.newBufferedReader(Path.of(resource), StandardCharsets.UTF_8);
+		return Files.newBufferedReader(Path.of(resource));
 	}
 
 	/**
@@ -172,7 +171,7 @@ public interface IOUtil {
 		if (stream == null) {
 			return null;
 		}
-		return new InputStreamReader(stream, StandardCharsets.UTF_8);
+		return new InputStreamReader(stream);
 	}
 
 	/**
@@ -322,7 +321,7 @@ public interface IOUtil {
 		if (in == null) {
 			return List.of();
 		}
-		return toLines(new InputStreamReader(in, StandardCharsets.UTF_8));
+		return toLines(new InputStreamReader(in));
 	}
 
 	/**

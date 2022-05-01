@@ -4,7 +4,6 @@ import org.byteinfo.util.io.IOUtil;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -36,10 +35,11 @@ public class FileWriter implements Writer {
 				synchronized (this) {
 					if (time > nextRollingTime) {
 						nextRollingTime = rolling.getNextRollingTime(time);
-						Path currentTarget = target.resolve(target + rolling.getSuffix(time));
+						String baseName = target.getFileName().toString();
+						Path currentTarget = target.getParent().resolve(baseName + rolling.getSuffix(time));
 						IOUtil.closeQuietly(writer);
-						writer = Files.newBufferedWriter(currentTarget, StandardCharsets.UTF_8, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-						String prefix = target.getFileName().toString() + ".";
+						writer = Files.newBufferedWriter(currentTarget, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+						String prefix = baseName + ".";
 						try (Stream<Path> list = Files.list(target.getParent())) {
 							list.filter(path -> path.getFileName().toString().startsWith(prefix)).sorted(Comparator.reverseOrder()).skip(backups + 1L).forEach(path -> {
 								try {

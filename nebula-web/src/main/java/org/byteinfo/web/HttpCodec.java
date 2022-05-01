@@ -3,6 +3,7 @@ package org.byteinfo.web;
 import org.byteinfo.util.io.LimitedInputStream;
 
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -17,7 +18,7 @@ import java.util.Map;
 
 public interface HttpCodec {
 	byte[] CRLF = {'\r', '\n'};
-	byte[] VERSION = "HTTP/1.1 ".getBytes(StandardCharsets.UTF_8);
+	byte[] VERSION = "HTTP/1.1 ".getBytes();
 
 	static Request parseRequest(InputStream in) throws IOException {
 		String line;
@@ -39,11 +40,11 @@ public interface HttpCodec {
 			path = path.substring(0, index);
 		}
 
-		// parse headers
+		// parse request headers
 		Headers headers = new Headers();
 		while ((line = readLine(in)).length() > 0) {
 			int separator = line.indexOf(':');
-			if (separator < 0) {
+			if (separator == -1) {
 				throw new WebException(StatusCode.BAD_REQUEST, "invalid header: " + line);
 			}
 			headers.add(line.substring(0, separator), line.substring(separator + 1).trim());
@@ -55,22 +56,21 @@ public interface HttpCodec {
 		return new Request(method, path, query, headers, length, new LimitedInputStream(in, length));
 	}
 
-	static Map<String, Cookie> decodeCookies(Headers headers) {
+	static Map<String, Cookie> parseCookies(Headers headers) {
 		Map<String, Cookie> map = new LinkedHashMap<>();
 		String cookieString = headers.get(HeaderName.COOKIE);
 		if (cookieString != null) {
 			for (String cookie : cookieString.split("; ")) {
-				String[] pair = cookie.split("=");
-				if (pair.length != 2) {
-					throw new WebException(StatusCode.BAD_REQUEST, "invalid cookie: " + cookie);
+				String[] pair = cookie.split("=", 2);
+				if (pair.length == 2) {
+					map.put(pair[0], new Cookie(pair[0], pair[1]));
 				}
-				map.put(pair[0], new Cookie(pair[0], pair[1]));
 			}
 		}
 		return map;
 	}
 
-	static Map<String, List<String>> decodeParams(Request request) throws IOException {
+	static Map<String, List<String>> parseParams(Request request) throws IOException {
 		Map<String, List<String>> params = new HashMap<>();
 		List<String> dataList = new ArrayList<>();
 		dataList.add(request.query());
@@ -82,14 +82,14 @@ public interface HttpCodec {
 			}
 		}
 		if (ContentType.FORM.equalsIgnoreCase(contentType)) {
-			dataList.add(new String(request.body().readAllBytes(), StandardCharsets.UTF_8));
+			dataList.add(new String(request.body().readAllBytes()));
 		}
 		for (String data : dataList) {
 			if (data == null || data.length() == 0) {
 				continue;
 			}
 			for (String part : data.split("&")) {
-				String[] pair = part.split("=");
+				String[] pair = part.split("=", 2);
 				List<String> values = params.computeIfAbsent(URLDecoder.decode(pair[0], StandardCharsets.UTF_8), k -> new ArrayList<>());
 				if (pair.length == 1) {
 					values.add("");
@@ -103,54 +103,47 @@ public interface HttpCodec {
 		return params;
 	}
 
-	static void writeResponse(OutputStream out, int status, Headers headers, Collection<Cookie> cookies, InputStream in, long length) throws IOException {
+	static void send(OutputStream out, int status, Headers headers, Collection<Cookie> cookies, InputStream data, long length) throws IOException {
+		// send response status line
 		out.write(VERSION);
-		out.write(String.valueOf(status).getBytes(StandardCharsets.UTF_8));
+		out.write(String.valueOf(status).getBytes());
 		out.write(CRLF);
 
+		// send response headers
 		if (headers == null) {
 			headers = new Headers();
 		}
+		headers.set(HeaderName.CONTENT_LENGTH, String.valueOf(length));
 
-		if (in != null) {
-			headers.set(HeaderName.CONTENT_LENGTH, String.valueOf(length));
-		}
-
+		// encode cookies
 		if (cookies != null) {
 			for (Cookie cookie : cookies) {
 				headers.add(HeaderName.SET_COOKIE, cookie.toString());
 			}
 		}
 
+		// write headers
 		for (Header header : headers.values()) {
-			out.write(header.name().getBytes(StandardCharsets.UTF_8));
-			out.write(": ".getBytes(StandardCharsets.UTF_8));
-			out.write(header.value().getBytes(StandardCharsets.UTF_8));
+			out.write(header.name().getBytes());
+			out.write(": ".getBytes());
+			out.write(header.value().getBytes());
 			out.write(CRLF);
 		}
-
 		out.write(CRLF);
 
-		if (in != null) {
-			in.transferTo(out);
+		// send response body
+		if (length > 0 && data != null) {
+			data.transferTo(out);
 		}
 		out.flush();
 	}
 
-	static void writeResponse(OutputStream out, int status, Headers headers, Collection<Cookie> cookies) throws IOException {
-		writeResponse(out, status, headers, cookies, null, 0);
-	}
-
-	static void writeResponse(OutputStream out, int status, Headers headers) throws IOException {
-		writeResponse(out, status, headers, null);
-	}
-
-	static void writeResponse(OutputStream out, int status) throws IOException {
-		writeResponse(out, status, null);
+	static void send(OutputStream out, int status) throws IOException {
+		send(out, status, null, null, null, 0);
 	}
 
 	static String readLine(InputStream in) throws IOException {
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream(1024 * 8);
 		int ch;
 		while ((ch = in.read()) != -1) {
 			if (ch == '\r') {
@@ -159,6 +152,9 @@ public interface HttpCodec {
 			}
 			buffer.write(ch);
 		}
-		return buffer.toString(StandardCharsets.UTF_8);
+		if (ch == -1) {
+			throw new EOFException();
+		}
+		return buffer.toString();
 	}
 }

@@ -3,14 +3,15 @@ package org.byteinfo.web;
 import org.byteinfo.context.Context;
 import org.byteinfo.logging.Log;
 import org.byteinfo.util.function.CheckedConsumer;
-import org.byteinfo.util.misc.Config;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -65,20 +66,25 @@ public class Server extends Context {
 		super(modules);
 
 		// load configurations
-		Config.load("class:org/byteinfo/web/application.properties");
-		Config.loadIf("class:application.properties");
+		AppConfig.get().load("class:org/byteinfo/web/application.properties");
+		Log.info("Loading default config: org/byteinfo/web/application.properties");
+
+		boolean loaded = AppConfig.get().loadIf("class:application.properties");
+		if (loaded) {
+			Log.info("Loading optional config: application.properties");
+		}
 
 		// init runtime variables
 		int processors = Runtime.getRuntime().availableProcessors();
-		Config.load(Map.of(
+		AppConfig.get().load(Map.of(
 				"runtime.pid", ProcessHandle.current().pid(),
 				"runtime.processors", processors));
 
 		// system properties have the highest priority
-		Config.load(System.getProperties());
+		AppConfig.get().load(System.getProperties());
 
 		// interpolate variables
-		Config.interpolate();
+		AppConfig.get().interpolate();
 
 		// init asset handler
 		ASSET_HANDLER = new AssetHandler();
@@ -88,10 +94,10 @@ public class Server extends Context {
 		if (started) {
 			return this;
 		}
-		int port = Config.getInt("http.port");
-		int backlog = Config.getInt("http.backlog");
-		InetAddress bindAddr = InetAddress.getByName(Config.get("http.bindAddr"));
-		int timeout = Config.getInt("session.timeout") * 60 * 1000;
+		int port = AppConfig.get().getInt("http.port");
+		int backlog = AppConfig.get().getInt("http.backlog");
+		InetAddress bindAddr = InetAddress.getByName(AppConfig.get().get("http.bindAddr"));
+		int timeout = AppConfig.get().getInt("session.timeout") * 60 * 1000;
 		serverSocket = new ServerSocket(port, backlog, bindAddr);
 		serverSocket.setReuseAddress(true);
 		Thread main = new Thread(() -> {
@@ -105,9 +111,11 @@ public class Server extends Context {
 							socket.setSoTimeout(timeout);
 							handleConnection(socket);
 						} catch (SocketTimeoutException e) {
-							// ignored
+							Log.debug("Connection Timeout: {}", socket);
+						} catch (EOFException e) {
+							Log.debug("EOF Reached: {}", socket);
 						} catch (Throwable t) {
-							Log.error(t);
+							Log.error(t, "Connection Error: {}", socket);
 						} finally {
 							Log.debug("Disconnected: {}", socket);
 						}
@@ -123,7 +131,7 @@ public class Server extends Context {
 		for (CheckedConsumer<Server> handler : onStartHandlers) {
 			handler.accept(this);
 		}
-		Log.info("Server started: listening http://{}:{}", Config.get("http.bindAddr"), port);
+		Log.info("Server started: http://127.0.0.1:{} listening {}", port, bindAddr);
 		return this;
 	}
 
@@ -140,6 +148,7 @@ public class Server extends Context {
 				}
 			}
 		}
+		Log.info("Server stopped.");
 		return this;
 	}
 
@@ -238,7 +247,6 @@ public class Server extends Context {
 	private void handleConnection(Socket socket) throws Exception {
 		InputStream in = new BufferedInputStream(socket.getInputStream());
 		OutputStream out = new BufferedOutputStream(socket.getOutputStream());
-		OutputStream nullOut = OutputStream.nullOutputStream();
 		while (true) {
 			HttpContext ctx = null;
 			Object result = null;
@@ -247,6 +255,7 @@ public class Server extends Context {
 			try {
 				// parse request
 				ctx = new HttpContext(socket, in, out);
+				Log.debug("#{}: {} {} {}", ctx.id(), ctx.method(), ctx.path(), socket.getRemoteSocketAddress());
 
 				// exact handler
 				handler = exactHandlers.getOrDefault(ctx.path(), Collections.emptyMap()).get(ctx.method());
@@ -293,11 +302,18 @@ public class Server extends Context {
 				}
 			} catch (Throwable t) {
 				th = t;
+				if (t instanceof InvocationTargetException ex && ex.getCause() != null) {
+					th = ex.getCause();
+				}
 				if (ctx == null) { // failed to parse request
-					HttpCodec.writeResponse(out, StatusCode.BAD_REQUEST);
+					try {
+						HttpCodec.send(out, StatusCode.BAD_REQUEST);
+					} catch (Exception e) {
+						// ignore
+					}
 					throw t;
 				} else {
-					result = errorHandler.handle(ctx, t);
+					result = errorHandler.handle(ctx, th);
 				}
 			} finally {
 				if (ctx != null) {
@@ -316,7 +332,8 @@ public class Server extends Context {
 					}
 
 					// clear pending request body
-					ctx.body().transferTo(nullOut);
+					ctx.body().transferTo(OutputStream.nullOutputStream());
+					Log.debug("#{}: {} {}", ctx.id(), ctx.responseStatus(), ctx.responseLength());
 				}
 			}
 

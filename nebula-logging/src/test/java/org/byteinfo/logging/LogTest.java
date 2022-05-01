@@ -11,7 +11,7 @@ public class LogTest {
 		Log.debug("Hello World.");
 		Log.info("Hello {}.", "World");
 		Log.warn(() -> "Hello World.");
-		Log.error(new Throwable(), "Hello World.");
+		Log.error(new Throwable(), "Hello World with Exception:");
 	}
 
 	@Test
@@ -21,6 +21,6 @@ public class LogTest {
 		log.debug("Hello World.");
 		log.info("Hello {}.", "World");
 		log.warn("Hello World.");
-		log.error("Hello World.", new Throwable());
+		log.error("Hello World with Exception:", new Throwable());
 	}
 }

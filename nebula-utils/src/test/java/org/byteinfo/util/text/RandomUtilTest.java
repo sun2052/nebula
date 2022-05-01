@@ -1,4 +1,4 @@
-package org.byteinfo.util.codec;
+package org.byteinfo.util.text;
 
 import org.junit.jupiter.api.Test;
 

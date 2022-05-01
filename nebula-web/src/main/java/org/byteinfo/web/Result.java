@@ -5,36 +5,79 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.net.URLConnection;
+import java.util.Base64;
 import java.util.function.Supplier;
 
 public class Result {
-	protected String type;
-	protected long length;
-	protected Supplier<InputStream> supplier;
+	private int status = StatusCode.OK;
+	private String type = ContentType.HTML;
+	private long length;
+	private String eTag;
+	private Supplier<InputStream> supplier = InputStream::nullInputStream;
 
-	public Result() {
+	protected Result() {
 	}
 
-	public Result(byte[] data, String type) {
+	public static Result of(String data) {
+		return of(data.getBytes());
+	}
+
+	public static Result of(byte[] data) {
+		return new Result()
+				.setSupplier(() -> new ByteArrayInputStream(data))
+				.setLength(data.length);
+	}
+
+	public static Result of(URL data) throws IOException {
+		URLConnection connection = data.openConnection();
+		long length = connection.getContentLengthLong();
+		long modified = connection.getLastModified();
+		return new Result()
+				.setSupplier(() -> {
+					try {
+						return new BufferedInputStream(data.openStream());
+					} catch (IOException e) {
+						throw new WebException(e);
+					}
+				})
+				.setLength(length)
+				.setETag('"' + Base64.getEncoder().withoutPadding().encodeToString((modified + "-" + length).getBytes()) + '"');
+	}
+
+
+	/* ---------------- Setter -------------- */
+
+	public Result setStatus(int status) {
+		this.status = status;
+		return this;
+	}
+
+	public Result setType(String type) {
 		this.type = type;
-		this.length = data.length;
-		this.supplier = () -> new ByteArrayInputStream(data);
+		return this;
 	}
 
-	public Result(URL url, String type) throws IOException {
-		this.type = type;
-		this.length = url.openConnection().getContentLengthLong();
-		this.supplier = () -> {
-			try {
-				return new BufferedInputStream(url.openStream());
-			} catch (IOException e) {
-				throw new WebException(e);
-			}
-		};
+	public Result setLength(long length) {
+		this.length = length;
+		return this;
 	}
 
-	public InputStream stream() {
-		return supplier.get();
+	public Result setETag(String eTag) {
+		this.eTag = eTag;
+		return this;
+	}
+
+	public Result setSupplier(Supplier<InputStream> supplier) {
+		this.supplier = supplier;
+		return this;
+	}
+
+
+	/* ---------------- Getter -------------- */
+
+	public int status() {
+		return status;
 	}
 
 	public String type() {
@@ -43,5 +86,13 @@ public class Result {
 
 	public long length() {
 		return length;
+	}
+
+	public String eTag() {
+		return eTag;
+	}
+
+	public InputStream stream() {
+		return supplier.get();
 	}
 }
