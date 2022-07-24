@@ -3,6 +3,7 @@ package org.byteinfo.web;
 import org.byteinfo.context.Context;
 import org.byteinfo.logging.Log;
 import org.byteinfo.util.function.CheckedConsumer;
+import org.byteinfo.util.function.Unchecked;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -100,31 +101,27 @@ public class Server extends Context {
 		int timeout = AppConfig.get().getInt("session.timeout") * 60 * 1000;
 		serverSocket = new ServerSocket(port, backlog, bindAddr);
 		serverSocket.setReuseAddress(true);
-		Thread main = new Thread(() -> {
+		Thread main = new Thread(Unchecked.runnable(() -> {
 			while (started) {
-				try {
-					Socket socket = serverSocket.accept();
-					executor.execute(() -> {
-						try (socket) {
-							Log.debug("Connected: {}", socket);
-							socket.setTcpNoDelay(true);
-							socket.setSoTimeout(timeout);
-							handleConnection(socket);
-						} catch (SocketTimeoutException e) {
-							Log.debug("Connection Timeout: {}", socket);
-						} catch (EOFException e) {
-							Log.debug("EOF Reached: {}", socket);
-						} catch (Throwable t) {
-							Log.error(t, "Connection Error: {}", socket);
-						} finally {
-							Log.debug("Disconnected: {}", socket);
-						}
-					});
-				} catch (IOException ioe) {
-					throw new RuntimeException(ioe);
-				}
+				Socket socket = serverSocket.accept();
+				executor.execute(() -> {
+					try (socket) {
+						Log.debug("Connected: {}", socket);
+						socket.setTcpNoDelay(true);
+						socket.setSoTimeout(timeout);
+						handleConnection(socket);
+					} catch (SocketTimeoutException e) {
+						Log.debug("Connection Timeout: {}", socket);
+					} catch (EOFException e) {
+						Log.debug("EOF Reached: {}", socket);
+					} catch (Exception e) {
+						Log.error(e, "Connection Error: {}", socket);
+					} finally {
+						Log.debug("Disconnected: {}", socket);
+					}
+				});
 			}
-		});
+		}));
 		main.setName(getClass().getSimpleName() + "-" + port);
 		main.start();
 		started = true;
@@ -300,18 +297,18 @@ public class Server extends Context {
 						}
 					}
 				}
-			} catch (Throwable t) {
-				th = t;
-				if (t instanceof InvocationTargetException ex && ex.getCause() != null) {
+			} catch (Exception e) {
+				th = e;
+				if (e instanceof InvocationTargetException ex && ex.getCause() != null) {
 					th = ex.getCause();
 				}
 				if (ctx == null) { // failed to parse request
 					try {
 						HttpCodec.send(out, StatusCode.BAD_REQUEST);
-					} catch (Exception e) {
+					} catch (Exception ex) {
 						// ignore
 					}
-					throw t;
+					throw e;
 				} else {
 					result = errorHandler.handle(ctx, th);
 				}

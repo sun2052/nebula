@@ -1,5 +1,7 @@
 package org.byteinfo.util.io;
 
+import org.byteinfo.util.function.Unchecked;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.Closeable;
@@ -41,7 +43,7 @@ public interface IOUtil {
 			try {
 				return path.normalize().toUri().toURL();
 			} catch (MalformedURLException e) {
-				throw new RuntimeException(e);
+				Unchecked.sneakyThrow(e);
 			}
 		}
 		return null;
