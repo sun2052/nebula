@@ -278,16 +278,18 @@ interface AsmUtil {
 		}
 	}
 
-	static void loadArgument(MethodVisitor mv, MethodInfo info, int index) {
-		Type type = info.argumentTypes()[index];
-		int offset = info.argumentOffset(index);
-		switch (type.getDescriptor().charAt(0)) {
-			case 'V' -> {}
-			case 'I', 'Z', 'C', 'B', 'S' -> mv.visitVarInsn(ILOAD, offset);
-			case 'J' -> mv.visitVarInsn(LLOAD, offset);
-			case 'F' -> mv.visitVarInsn(FLOAD, offset);
-			case 'D' -> mv.visitVarInsn(DLOAD, offset);
-			case '[', 'L' -> mv.visitVarInsn(ALOAD, offset);
+	static void loadAllArguments(MethodVisitor mv, MethodInfo info) {
+		for (int i = 0; i < info.argumentsCount(); i++) {
+			Type type = info.argumentTypes()[i];
+			int offset = info.argumentOffset(i);
+			switch (type.getDescriptor().charAt(0)) {
+				case 'V' -> {}
+				case 'I', 'Z', 'C', 'B', 'S' -> mv.visitVarInsn(ILOAD, offset);
+				case 'J' -> mv.visitVarInsn(LLOAD, offset);
+				case 'F' -> mv.visitVarInsn(FLOAD, offset);
+				case 'D' -> mv.visitVarInsn(DLOAD, offset);
+				case '[', 'L' -> mv.visitVarInsn(ALOAD, offset);
+			}
 		}
 	}
 

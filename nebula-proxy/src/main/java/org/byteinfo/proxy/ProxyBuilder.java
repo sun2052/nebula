@@ -56,10 +56,11 @@ public class ProxyBuilder extends ClassVisitor {
 			return null;
 		}
 
-		if (name.equals(INSTANCE_INITIALIZER)) {
+		if (name.equals(INSTANCE_INITIALIZER) && (access & ACC_PRIVATE) == 0) {
 			MethodVisitor mv = cw.visitMethod(access, name, descriptor, signature, exceptions);
 			mv.visitCode();
 			mv.visitVarInsn(ALOAD, 0);
+			AsmUtil.loadAllArguments(mv, MethodInfo.of(name, descriptor, new String[0]));
 			mv.visitMethodInsn(INVOKESPECIAL, superName, name, descriptor, false);
 			mv.visitInsn(RETURN);
 			mv.visitMaxs(0, 0);
@@ -145,9 +146,7 @@ public class ProxyBuilder extends ClassVisitor {
 													switch (name) {
 														case "proceed" -> {
 															mv.visitVarInsn(ALOAD, 0);
-															for (int j = 0; j < info.argumentsCount(); j++) {
-																AsmUtil.loadArgument(mv, info, j);
-															}
+															AsmUtil.loadAllArguments(mv, info);
 															if (isLast) {
 																mv.visitMethodInsn(INVOKESPECIAL, superName, info.name(), info.descriptor(), false);
 																AsmUtil.boxing(mv, info.returnType());
