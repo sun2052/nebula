@@ -52,7 +52,7 @@ public class Context {
 		List<TypeProcessor> list = new ArrayList<>();
 		for (Object module : modules) {
 			if (module instanceof Class<?> clazz) {
-				throw new ContextException(clazz.getName() + " provided as class instead of an instance.");
+				throw new ContextException(clazz.getName() + " must be provided as an instance.");
 			}
 			if (module instanceof TypeProcessor processor) {
 				list.add(processor);
@@ -222,7 +222,7 @@ public class Context {
 			}
 		}
 		if (inject == null) {
-			throw new ContextException(key + ": Either @Inject constructor or @Provides method is expected.");
+			throw new ContextException(key + ": Either single constructor or @Inject constructor is required.");
 		}
 		inject.setAccessible(true);
 		return inject;
