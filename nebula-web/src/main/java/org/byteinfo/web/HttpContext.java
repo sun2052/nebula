@@ -1,7 +1,7 @@
 package org.byteinfo.web;
 
-import org.byteinfo.util.text.RandomUtil;
 import org.byteinfo.util.io.IOUtil;
+import org.byteinfo.util.text.RandomUtil;
 import org.byteinfo.util.time.WheelTimer;
 
 import java.io.ByteArrayInputStream;
@@ -36,7 +36,7 @@ public class HttpContext {
 	private final Socket socket;
 	private final OutputStream out;
 	private final Request request;
-	private String path;
+	private final String path;
 	private String securityAttribute;
 	private Map<String, Cookie> cookies;
 	private Map<String, List<String>> params;
@@ -48,12 +48,20 @@ public class HttpContext {
 	private long responseLength;
 	private boolean committed;
 
-	public HttpContext(Socket socket, InputStream in, OutputStream out) throws IOException {
-		this.id = ID_GENERATOR.incrementAndGet();
+	private HttpContext(long id, Socket socket, OutputStream out, Request request, String path) {
+		this.id = id;
 		this.socket = socket;
 		this.out = out;
-		request = HttpCodec.parseRequest(in);
-		path = request.path().substring(CONTEXT_PATH.length());
+		this.request = request;
+		this.path = path;
+	}
+
+	public static HttpContext of(Socket socket, InputStream in, OutputStream out) throws IOException {
+		Request request = HttpCodec.parseRequest(in);
+		if (request == null) {
+			return null;
+		}
+		return new HttpContext(ID_GENERATOR.incrementAndGet(), socket, out, request, request.path().substring(CONTEXT_PATH.length()));
 	}
 
 

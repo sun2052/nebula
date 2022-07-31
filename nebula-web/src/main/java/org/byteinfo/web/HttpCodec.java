@@ -3,7 +3,6 @@ package org.byteinfo.web;
 import org.byteinfo.util.io.LimitedInputStream;
 
 import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -16,14 +15,28 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Minimal HTTP/1.1 Codec
+ */
 public interface HttpCodec {
 	byte[] CRLF = {'\r', '\n'};
 	byte[] VERSION = "HTTP/1.1 ".getBytes();
 
+	/**
+	 * Parses a raw HTTP request.
+	 *
+	 * @param in raw HTTP request
+	 * @return request or null if connection is closed
+	 * @throws IOException if an io exception occurs
+	 * @throws WebException if the request can't be parsed
+	 */
 	static Request parseRequest(InputStream in) throws IOException {
 		String line;
-		while ((line = readLine(in)).length() == 0) {
-			// ignore empty lines
+		while ((line = readLine(in)) != null && line.isEmpty()) {
+			// ignore possible empty lines
+		}
+		if (line == null) {
+			return null;
 		}
 
 		// parse request line
@@ -42,12 +55,15 @@ public interface HttpCodec {
 
 		// parse request headers
 		Headers headers = new Headers();
-		while ((line = readLine(in)).length() > 0) {
+		while ((line = readLine(in)) != null && !line.isEmpty()) {
 			int separator = line.indexOf(':');
 			if (separator == -1) {
 				throw new WebException(StatusCode.BAD_REQUEST, "invalid header: " + line);
 			}
 			headers.add(line.substring(0, separator), line.substring(separator + 1).trim());
+		}
+		if (line == null) {
+			return null;
 		}
 
 		// parse request body
@@ -56,6 +72,12 @@ public interface HttpCodec {
 		return new Request(method, path, query, headers, length, new LimitedInputStream(in, length));
 	}
 
+	/**
+	 * Parses all HTTP Cookies from the HTTP request headers.
+	 *
+	 * @param headers the HTTP request headers
+	 * @return a map of the cookie name and the corresponding cookie
+	 */
 	static Map<String, Cookie> parseCookies(Headers headers) {
 		Map<String, Cookie> map = new LinkedHashMap<>();
 		String cookieString = headers.get(HeaderName.COOKIE);
@@ -70,6 +92,14 @@ public interface HttpCodec {
 		return map;
 	}
 
+	/**
+	 * Parses all HTTP request params from both the query string and the urlencoded form.
+	 *
+	 * @param request the HTTP request
+	 * @return a map of the param name and the corresponding param value list
+	 * @throws IOException if an io exception occurs
+	 * @throws WebException if the request can't be parsed
+	 */
 	static Map<String, List<String>> parseParams(Request request) throws IOException {
 		Map<String, List<String>> params = new HashMap<>();
 		List<String> dataList = new ArrayList<>();
@@ -103,6 +133,17 @@ public interface HttpCodec {
 		return params;
 	}
 
+	/**
+	 * Sends a full HTTP response.
+	 *
+	 * @param out response output stream
+	 * @param status response status
+	 * @param headers response headers or null if not required
+	 * @param cookies response cookies or null if not required
+	 * @param data response body or null if not required
+	 * @param length response body length
+	 * @throws IOException if an io exception occurs
+	 */
 	static void send(OutputStream out, int status, Headers headers, Collection<Cookie> cookies, InputStream data, long length) throws IOException {
 		// send response status line
 		out.write(VERSION);
@@ -138,10 +179,24 @@ public interface HttpCodec {
 		out.flush();
 	}
 
+	/**
+	 * Sends a minimal HTTP response.
+	 *
+	 * @param out response output stream
+	 * @param status response status
+	 * @throws IOException if an io exception occurs
+	 */
 	static void send(OutputStream out, int status) throws IOException {
 		send(out, status, null, null, null, 0);
 	}
 
+	/**
+	 * Reads a line of ASCII characters terminated by "\r\n".
+	 *
+	 * @param in data source
+	 * @return a line of ASCII characters or null if EOF is reached
+	 * @throws IOException if an io exception occurs
+	 */
 	static String readLine(InputStream in) throws IOException {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream(1024 * 8);
 		int ch;
@@ -153,7 +208,7 @@ public interface HttpCodec {
 			buffer.write(ch);
 		}
 		if (ch == -1) {
-			throw new EOFException();
+			return null;
 		}
 		return buffer.toString();
 	}

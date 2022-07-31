@@ -27,8 +27,8 @@ public class AssetHandler implements Handler {
 		String type = ContentType.byName(path);
 
 		if (pathRoot != null) {
-			Path file = pathRoot.resolve(path.substring(1));
-			if (Files.exists(file) && Files.isRegularFile(file)) {
+			Path file = pathRoot.resolve(path.substring(1)).normalize();
+			if (file.startsWith(pathRoot) && Files.exists(file) && Files.isRegularFile(file)) {
 				return Result.of(file.toUri().toURL()).setType(type);
 			}
 		}

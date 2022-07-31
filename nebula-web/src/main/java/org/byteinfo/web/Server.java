@@ -7,7 +7,6 @@ import org.byteinfo.util.function.Unchecked;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -112,8 +111,6 @@ public class Server extends Context {
 						handleConnection(socket);
 					} catch (SocketTimeoutException e) {
 						Log.debug("Connection Timeout: {}", socket);
-					} catch (EOFException e) {
-						Log.debug("EOF Reached: {}", socket);
 					} catch (Exception e) {
 						Log.error(e, "Connection Error: {}", socket);
 					} finally {
@@ -251,13 +248,19 @@ public class Server extends Context {
 			Throwable th = null;
 			try {
 				// parse request
-				ctx = new HttpContext(socket, in, out);
+				ctx = HttpContext.of(socket, in, out);
+				if (ctx == null) {
+					Log.debug("Closed by remote peer: {}", socket);
+					break;
+				}
+
+				// process request
 				Log.debug("#{}: {} {} {}", ctx.id(), ctx.method(), ctx.path(), socket.getRemoteSocketAddress());
 
-				// exact handler
+				// search for exact handler
 				handler = exactHandlers.getOrDefault(ctx.path(), Collections.emptyMap()).get(ctx.method());
 
-				// generic handler
+				// search for generic handler
 				if (handler == null) {
 					for (Map.Entry<String, Map<String, Handler>> entry : genericHandlers.entrySet()) {
 						if (ctx.path().startsWith(entry.getKey())) {

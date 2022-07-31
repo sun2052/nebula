@@ -4,8 +4,35 @@ Nebula Proxy
 Lightweight [ASM-Based](https://asm.ow2.io/) Runtime Proxy Generator
 
 
-Usage
------
+Feature
+-------
+
+* Minimal Overhead: **140 KB**
+* Concise API: `Proxy.of(Target.class).with(aspects).instance()`
+* Simple Design: **Runtime Subclass Generation**
+
+
+Documentation
+--------------
+
+### Terminology
+
+* Aspect:  a pointcut and advice pair
+* Pointcut: identify the method to be applied
+* Advice: custom logic to be applied
+
+### Usage
+
+```java
+Proxy.of(Target.class) // specify proxy target
+		.with(Aspect.of(pointcut, MyAdvice.class)) // specify custom logic
+        .debugPath(Path.of("/tmp/generated.class")) // optional, output generated class file
+        .instance(); // get generate proxy, create(): class file by byte[], load(): Class<?> obj, instance(): instance
+```
+
+
+Demo
+----
 
 ```java
 // proxy target
@@ -16,6 +43,9 @@ class Target {
         return obj;
     }
 }
+
+// pointcut
+Pointcut pointcut = info -> info.name().equals("test");
 
 // advice
 class MyAdvice implements Advice {
@@ -32,7 +62,6 @@ class MyAdvice implements Advice {
 }
 
 // create proxy
-Pointcut pointcut = info -> info.name().equals("test");
 Target t = Proxy.of(Target.class).with(Aspect.of(pointcut, MyAdvice.class)).instance();
 System.out.println(">>> " + t.test("Hello"));
 ```
