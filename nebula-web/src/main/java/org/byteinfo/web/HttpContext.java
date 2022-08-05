@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 public class HttpContext {
 	public static final AtomicLong ID_GENERATOR = new AtomicLong();
 	public static final Map<String, Session> SESSIONS = new ConcurrentHashMap<>(AppConfig.get().getInt("session.capacity"));
-	public static final int SESSION_TIMEOUT = AppConfig.get().getInt("session.timeout") * 60;
+	public static final long SESSION_TIMEOUT = AppConfig.get().getInt("session.timeout") * 60 * 1000L;
 	public static final int SESSION_ID_LENGTH = AppConfig.get().getInt("session.length");
 	public static final String SESSION_COOKIE_NAME = AppConfig.get().get("session.name");
 	public static final String CONTEXT_PATH = AppConfig.get().get("http.contextPath");

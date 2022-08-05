@@ -1,11 +1,13 @@
 package org.byteinfo.util.time;
 
 import org.byteinfo.util.function.CheckedConsumer;
+import org.byteinfo.util.function.Unchecked;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 /**
- * A handle associated with a task that is returned by a WheelTimer.
+ * A handle for the scheduled task.
  */
 public class Timeout {
 	public static final int ST_INIT = 0;
@@ -15,12 +17,12 @@ public class Timeout {
 	private volatile int state = ST_INIT;
 	private static final AtomicIntegerFieldUpdater<Timeout> STATE_UPDATER = AtomicIntegerFieldUpdater.newUpdater(Timeout.class, "state");
 
-	final CheckedConsumer<Timeout> task;
-	final WheelTimer timer;
-	final long deadline;
+	private final CheckedConsumer<Timeout> task;
+	private final long deadline;
+	private final WheelTimer timer;
 	int pendingRounds;
 
-	WheelTimer.Bucket bucket;
+	WheelTimer.Slot slot;
 	Timeout next;
 	Timeout prev;
 
@@ -28,13 +30,13 @@ public class Timeout {
 	 * Creates a new Timeout.
 	 *
 	 * @param task task to be scheduled
-	 * @param timer timer to be used
 	 * @param deadline task deadline
+	 * @param timer timer to be used
 	 */
-	Timeout(CheckedConsumer<Timeout> task, WheelTimer timer, long deadline) {
+	Timeout(CheckedConsumer<Timeout> task, long deadline, WheelTimer timer) {
 		this.task = task;
-		this.timer = timer;
 		this.deadline = deadline;
+		this.timer = timer;
 	}
 
 	/**
@@ -53,6 +55,15 @@ public class Timeout {
 	 */
 	public CheckedConsumer<Timeout> task() {
 		return task;
+	}
+
+	/**
+	 * Gets the deadline of this Timeout.
+	 *
+	 * @return deadline in millis
+	 */
+	public long deadline() {
+		return deadline;
 	}
 
 	/**
@@ -79,17 +90,9 @@ public class Timeout {
 	/**
 	 * Executes this Timeout.
 	 */
-	public void execute() {
+	public void execute(ExecutorService executor) {
 		if (compareAndSetState(ST_INIT, ST_EXPIRED)) {
-			try {
-				task.accept(this);
-			} catch (Exception e) {
-				try {
-					timer.exceptionHandler.accept(e);
-				} catch (Exception ex) {
-					// ignore
-				}
-			}
+			executor.execute(Unchecked.runnable(() -> task.accept(this)));
 		}
 	}
 
@@ -106,6 +109,6 @@ public class Timeout {
 
 	@Override
 	public String toString() {
-		return "Timeout{" + "state=" + state + ", deadline=" + deadline + ", pendingRounds=" + pendingRounds + '}';
+		return String.format("Timeout{state=%d, deadline=%d, pendingRounds=%d}", state, deadline, pendingRounds);
 	}
 }
