@@ -4,19 +4,44 @@ Nebula Logging
 Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementation
 
 
+Features
+--------
+
+* concise, user-friendly API
+* console and file output with rolling support
+* dynamic configuration
+* SLF4J API implementation
+* lightweight, 19 KB
+
+
 Configuration
 -------------
 
-Configurations are located in the classpath.
+Syntax
 ```
-# default config: writer* = <value>
-org/byteinfo/logging/logging.properties
+[output[:options]]
+[output[;options]]
 
-# custom config
-logging.properties
+output: stdout, stderr, /path/to/file.{}.log
+options: level=info[,rolling=daily[,backups=60]]
+level = trace, debug, info, warn, error, off
+rolling = none, daily, monthly
+backups = max number of old log files to keep
+
+default:
+output = stdout
+level = info
+rolling = none, file output only
+backups = 30, file output only
+```
+
+Apply Config
+```
+# Java API
+Log.applyConfig("-Dnlog=/path/to/file.{}.log:rolling=daily,backups=60");
 
 # system properties
-java -Dwriter.level=INFO -jar app.jar
+java -Dnlog=/path/to/file.{}.log:rolling=daily,backups=60 -jar app.jar
 ```
 
 

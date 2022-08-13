@@ -10,10 +10,10 @@
 	<packaging>pom</packaging>
 
 	<modules>
-		<module>nebula-utils</module>
-		<module>nebula-context</module>
 		<module>nebula-logging</module>
+		<module>nebula-context</module>
 		<module>nebula-proxy</module>
+		<module>nebula-utils</module>
 		<module>nebula-web</module>
 	</modules>
 

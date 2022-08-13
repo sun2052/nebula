@@ -1,19 +1,17 @@
 package org.byteinfo.logging;
 
-import java.time.format.DateTimeFormatter;
+import java.io.PrintStream;
 import java.util.function.Supplier;
 
 public class ConsoleWriter implements Writer {
-	private final Level current;
+	private final PrintStream out;
 
-	public ConsoleWriter(Level level) {
-		current = level;
+	public ConsoleWriter(PrintStream out) {
+		this.out = out;
 	}
 
 	@Override
-	public void write(int offset, long time, DateTimeFormatter formatter, Level level, String thread, String message, Object[] params, Supplier<String> supplier, Throwable throwable) throws Exception {
-		if (isEnabled(level, current)) {
-			System.out.println(format(offset, time, formatter, level, thread, message, params, supplier, throwable));
-		}
+	public void write(long time, Level level, String thread, String message, Object[] params, Supplier<String> supplier, Throwable throwable) throws Exception {
+		out.println(Writer.formatLog(time, level, thread, message, params, supplier, throwable));
 	}
 }

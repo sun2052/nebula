@@ -1,71 +1,125 @@
 package org.byteinfo.logging;
 
-import org.byteinfo.util.misc.Config;
-
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 import java.util.function.Supplier;
 
-public class Log {
-	private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
-	private static final Level MIN_LEVEL;
-	private static final Writer[] WRITERS;
+public final class Log {
+	private static volatile Level level = Level.INFO;
+	private static volatile Writer writer;
 
 	static {
-		try {
-			Config config = new Config();
-			config.load("class:org/byteinfo/logging/logging.properties");
-			config.loadIf("class:logging.properties");
-			config.load(System.getProperties());
-
-			Level minLevel = Level.OFF;
-			List<Writer> writers = new ArrayList<>();
-			for (String name : config.getPropertyNames()) {
-				if (name.startsWith("writer") && !name.contains(".")) {
-					Level level = Level.valueOf(config.get(name + ".level"));
-					if (level.ordinal() < minLevel.ordinal()) {
-						minLevel = level;
-					}
-					String type = config.get(name);
-					if ("console".equals(type)) {
-						writers.add(new ConsoleWriter(level));
-					} else if ("file".equals(type)) {
-						Path target = Path.of(config.get(name + ".path"));
-						Rolling rolling = (Rolling) Rolling.class.getDeclaredField(config.get(name + ".rolling")).get(null);
-						int backups = Integer.parseInt(config.get(name + ".backups"));
-						writers.add(new FileWriter(level, target, rolling, backups));
-					} else {
-						throw new LogException("Unsupported Writer type: " + type);
-					}
-				}
-			}
-			MIN_LEVEL = minLevel;
-			WRITERS = writers.toArray(new Writer[0]);
-
-			// Runtime.getRuntime().addShutdownHook(new Thread(Log::shutdown));
-		} catch (Exception e) {
-			throw new LogException("Failed to initialize Nebula Logging.", e);
-		}
+		applyConfig(System.getProperty("nlog"));
 	}
 
 	private Log() {
 	}
 
-	public static void shutdown() {
-		for (Writer writer : WRITERS) {
-			try {
-				writer.close();
-			} catch (Exception e) {
-				throw new LogException("Failed to close Writer: " + writer.getClass().getName(), e);
+	/**
+	 * Parses and apply the specified config string.
+	 *
+	 * <pre>
+	 * [output[:options]]
+	 * [output[;options]]
+	 *
+	 * output: stdout, stderr, /path/to/file.{}.log
+	 * options: level=info[,rolling=daily[,backups=60]]
+	 * level = trace, debug, info, warn, error, off
+	 * rolling = none, daily, monthly
+	 * backups = max number of old log files to keep
+	 *
+	 * default:
+	 * output = stdout
+	 * level = info
+	 * rolling = none, file output only
+	 * backups = 30, file output only
+	 * </pre>
+	 *
+	 * @param config the config string
+	 */
+	public static void applyConfig(String config) {
+		if (config == null) {
+			level = Level.INFO;
+			writer = new ConsoleWriter(System.out);
+		} else {
+			String[] parts = config.split("[:;]");
+			if (parts.length > 2) {
+				throw new LogException("invalid config: " + config + ", expected: output[:options]]");
+			}
+
+			Rolling rolling = Rolling.NONE;
+			int backups = 0;
+			if (parts.length == 2) {
+				for (String optionStr : parts[1].split(",")) {
+					String[] option = optionStr.split("=");
+					if (option.length != 2) {
+						throw new LogException("invalid config option: " + optionStr + ", expected: level=info[,rolling=daily[,backups=60]]");
+					}
+					switch (option[0]) {
+						case "level":
+							var levelOption = Arrays.stream(Level.values()).filter(value -> value.name().equalsIgnoreCase(option[1])).findFirst();
+							if (levelOption.isPresent()) {
+								level = levelOption.get();
+							} else {
+								throw new LogException("invalid level option: " + optionStr + ", expected: [trace, debug, info, warn, error, off]");
+							}
+							break;
+
+						case "rolling":
+							try {
+								rolling = (Rolling) Rolling.class.getDeclaredField(option[1].toUpperCase()).get(null);
+							} catch (Exception e) {
+								throw new LogException("invalid rolling option: " + optionStr + ", expected: [none, daily, monthly]");
+							}
+							break;
+
+						case "backups":
+							try {
+								backups = Integer.parseInt(option[1]);
+							} catch (Exception e) {
+								throw new LogException("invalid backups option: " + optionStr + ", expected: >= 0");
+							}
+							break;
+
+						default:
+							throw new LogException("unknown config option: " + optionStr + ", expected: level=info[,rolling=daily[,backups=60]]");
+					}
+				}
+			}
+
+			switch (parts[0]) {
+				case "stdout" -> writer = new ConsoleWriter(System.out);
+				case "stderr" -> writer = new ConsoleWriter(System.err);
+				default -> {
+					Path path = Path.of(parts[0]);
+					if (Files.notExists(path.getParent())) {
+						throw new LogException("invalid output config: " + parts[0] + ", parent path does not exist");
+					}
+					writer = new FileWriter(path, rolling, backups);
+				}
 			}
 		}
 	}
 
+	public static void setLevel(Level level) {
+		Log.level = level;
+	}
+
+	public static void setWriter(Writer writer) {
+		Log.writer = writer;
+	}
+
+	public static void shutdown() {
+		try {
+			writer.close();
+		} catch (Exception e) {
+			throw new LogException("Failed to close Writer: " + writer.getClass().getName(), e);
+		}
+	}
+
 	public static boolean isLoggable(Level target) {
-		return target.ordinal() >= MIN_LEVEL.ordinal();
+		return target.ordinal() >= level.ordinal();
 	}
 
 	/**
@@ -208,13 +262,10 @@ public class Log {
 	 */
 	public static void dispatch(Level level, String message, Object[] params, Supplier<String> supplier, Throwable throwable) {
 		if (isLoggable(level)) {
-			long time = System.currentTimeMillis();
-			for (Writer writer : WRITERS) {
-				try {
-					writer.write(0, time, FORMATTER, level, Thread.currentThread().getName(), message, params, supplier, throwable);
-				} catch (Exception e) {
-					throw new LogException("Failed to write message to Writer: " + writer.getClass().getName(), e);
-				}
+			try {
+				writer.write(System.currentTimeMillis(), level, Thread.currentThread().getName(), message, params, supplier, throwable);
+			} catch (Exception e) {
+				throw new LogException("Failed to write message to Writer: " + writer.getClass().getName(), e);
 			}
 		}
 	}

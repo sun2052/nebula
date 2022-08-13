@@ -7,9 +7,9 @@ Nebula is a set of micro-frameworks and utilities for Java 19+.
 Modules
 -------
 
-### [Nebula Utils](nebula-utils)
+### [Nebula Logging](nebula-logging)
 
-Lightweight Utilities
+Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementation
 
 
 ### [Nebula Context](nebula-context)
@@ -17,14 +17,14 @@ Lightweight Utilities
 Lightweight Dependency Injection ([JSR 330](https://www.jcp.org/en/jsr/detail?id=330)) Implementation
 
 
-### [Nebula Logging](nebula-logging)
-
-Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementation
-
-
 ### [Nebula Proxy](nebula-proxy)
 
 Lightweight [ASM-Based](https://asm.ow2.io/) Runtime Proxy Generator
+
+
+### [Nebula Utils](nebula-utils)
+
+Lightweight Utilities
 
 
 ### [Nebula Web](nebula-web)

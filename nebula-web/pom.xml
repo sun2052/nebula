@@ -14,12 +14,17 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.byteinfo</groupId>
-			<artifactId>nebula-context</artifactId>
+			<artifactId>nebula-logging</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.byteinfo</groupId>
-			<artifactId>nebula-logging</artifactId>
+			<artifactId>nebula-utils</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.byteinfo</groupId>
+			<artifactId>nebula-context</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 	</dependencies>
