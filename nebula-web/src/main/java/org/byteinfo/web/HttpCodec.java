@@ -159,6 +159,9 @@ public interface HttpCodec {
 		// encode cookies
 		if (cookies != null) {
 			for (Cookie cookie : cookies) {
+				if (cookie.getPath() == null) {
+					cookie.setPath("/");
+				}
 				headers.add(HeaderName.SET_COOKIE, cookie.toString());
 			}
 		}
