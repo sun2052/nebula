@@ -94,6 +94,7 @@ public class Server extends Context {
 		if (started) {
 			return this;
 		}
+		started = true;
 		int port = AppConfig.get().getInt("http.port");
 		int backlog = AppConfig.get().getInt("http.backlog");
 		InetAddress bindAddr = InetAddress.getByName(AppConfig.get().get("http.bindAddr"));
@@ -119,12 +120,11 @@ public class Server extends Context {
 				});
 			}
 		}));
-		main.setName(getClass().getSimpleName() + "-" + port);
-		main.start();
-		started = true;
 		for (CheckedConsumer<Server> handler : onStartHandlers) {
 			handler.accept(this);
 		}
+		main.setName(getClass().getSimpleName() + "-" + port);
+		main.start();
 		Log.info("Server started: http://127.0.0.1:{} listening {}", port, bindAddr);
 		return this;
 	}
