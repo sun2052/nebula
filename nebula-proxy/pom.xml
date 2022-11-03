@@ -13,7 +13,7 @@
 	<artifactId>nebula-proxy</artifactId>
 
 	<properties>
-		<asm.version>9.3</asm.version>
+		<asm.version>9.4</asm.version>
 	</properties>
 
 	<dependencies>

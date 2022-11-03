@@ -8,9 +8,9 @@ import org.byteinfo.util.misc.Platform;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
-import java.lang.foreign.MemorySession;
 import java.lang.foreign.SymbolLookup;
 import java.lang.invoke.MethodHandle;
 import java.net.InetSocketAddress;
@@ -258,10 +258,10 @@ public class Node {
 		int socketFd = (int) getFieldValue.apply("fd", target);
 
 		// invoke windows native api
-		try (MemorySession session = MemorySession.openConfined()) {
+		try (Arena arena = Arena.openConfined()) {
 			// get method handle
 			// https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-setsockopt
-			var symbol = SymbolLookup.libraryLookup("Ws2_32.dll", session).lookup("setsockopt").orElseThrow();
+			var symbol = SymbolLookup.libraryLookup("Ws2_32.dll", arena.scope()).find("setsockopt").orElseThrow();
 			var function = FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS, JAVA_INT);
 			MethodHandle methodHandle = Linker.nativeLinker().downcallHandle(symbol, function);
 
@@ -274,7 +274,7 @@ public class Node {
 			int optionValueByteSize = (int) JAVA_INT.byteSize();
 			for (Map.Entry<Integer, Integer> entry : Map.of(TCP_KEEPIDLE, keepAliveIdleTime, TCP_KEEPCNT, keepAliveProbeCount, TCP_KEEPINTVL, keepAliveProbeInterval).entrySet()) {
 				int optionName = entry.getKey();
-				var optionValue = session.allocate(JAVA_INT, entry.getValue());
+				var optionValue = arena.allocate(JAVA_INT, entry.getValue());
 				int ret = (int) methodHandle.invoke(socketFd, IPPROTO_TCP, optionName, optionValue, optionValueByteSize);
 				if (ret != 0) {
 					throw new RuntimeException("setsockopt() failed: ret=" + ret);

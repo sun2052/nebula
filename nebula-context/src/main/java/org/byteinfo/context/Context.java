@@ -31,7 +31,7 @@ public class Context {
 	private final Map<Key<?>, Object> singletons = new ConcurrentHashMap<>();
 	private final Map<Class<?>, List<Object[]>> injectFields = new ConcurrentHashMap<>();
 	private final Map<Class<?>, List<Method>> initMethods = new ConcurrentHashMap<>();
-	private final TypeProcessor[] typeProcessors;
+	private final List<TypeProcessor> typeProcessors = new ArrayList<>();
 
 	/**
 	 * Creates a new context.
@@ -49,13 +49,12 @@ public class Context {
 	 */
 	public Context(Iterable<Object> modules) {
 		providers.put(Key.of(Context.class), () -> this);
-		List<TypeProcessor> list = new ArrayList<>();
 		for (Object module : modules) {
 			if (module instanceof Class<?> clazz) {
 				throw new ContextException(clazz.getName() + " must be provided as an instance.");
 			}
 			if (module instanceof TypeProcessor processor) {
-				list.add(processor);
+				typeProcessors.add(processor);
 				continue;
 			}
 			for (Method method : module.getClass().getDeclaredMethods()) {
@@ -76,7 +75,6 @@ public class Context {
 				}
 			}
 		}
-		typeProcessors = list.toArray(new TypeProcessor[0]);
 	}
 
 	/**

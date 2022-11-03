@@ -1,7 +1,7 @@
 Nebula
 ======
 
-Nebula is a set of micro-frameworks and utilities for Java 19+.
+Nebula is a set of micro-frameworks for Java 20+.
 
 
 Modules
