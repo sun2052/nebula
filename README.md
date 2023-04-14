@@ -1,7 +1,7 @@
 Nebula
 ======
 
-Nebula is a set of micro-frameworks for Java 20+.
+Nebula is a set of micro-frameworks for Java 21+.
 
 
 Modules
@@ -34,7 +34,7 @@ Lightweight RPC Framework
 
 ### [Nebula Web](nebula-web)
 
-Minimal Web Framework based on [Project Loom](https://wiki.openjdk.java.net/display/loom/Main) (HTTP/1.1)
+Minimal Web Framework based on [JEP 444: Virtual Threads](https://openjdk.org/jeps/444) (HTTP/1.1)
 
 
 Build & Install

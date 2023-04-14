@@ -1,9 +1,8 @@
 package org.byteinfo.util.jdbc;
 
-import org.byteinfo.util.reflect.ReflectUtil;
+import org.byteinfo.util.reflect.Reflect;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -13,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -262,22 +262,17 @@ public interface JDBC {
 	}
 
 	private static Map<String, Object> getAllParams(Object query) throws SQLException {
+		Objects.requireNonNull(query);
 		Map<String, Object> map = new HashMap<>();
-		if (query == null) {
-			return map;
-		}
-		Map<String, Field> fields = ReflectUtil.getFields(query.getClass(), field -> {
-			int modifiers = field.getModifiers();
-			return !Modifier.isStatic(modifiers) && !Modifier.isTransient(modifiers);
-		});
-		for (Map.Entry<String, Field> entry : fields.entrySet()) {
+		Map<String, Field> fields = Reflect.getInstanceFields(query.getClass());
+		for (Field field : fields.values()) {
 			try {
-				Object value = entry.getValue().get(query);
-				if (value instanceof Optional) {
-					value = ((Optional<?>) value).orElse(null);
+				Object value = field.get(query);
+				if (value instanceof Optional<?> optional) {
+					value = optional.orElse(null);
 				}
 				if (value != null) {
-					map.putIfAbsent(entry.getValue().getName(), value);
+					map.putIfAbsent(field.getName(), value);
 				}
 			} catch (IllegalAccessException e) {
 				throw new SQLException(e);

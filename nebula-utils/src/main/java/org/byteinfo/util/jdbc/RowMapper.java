@@ -1,9 +1,9 @@
 package org.byteinfo.util.jdbc;
 
-import org.byteinfo.util.reflect.ReflectUtil;
+import org.byteinfo.util.function.Unchecked;
+import org.byteinfo.util.reflect.Reflect;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -13,6 +13,7 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -34,32 +35,21 @@ public interface RowMapper<T> {
 	/**
 	 * Get a reflective RowMapper of the specified type.
 	 *
-	 * @param type target type
+	 * @param clazz target type
 	 * @return reflective RowMapper
 	 */
-	static <T> RowMapper<T> REFLECTIVE(Class<T> type) {
+	static <T> RowMapper<T> REFLECTIVE(Class<T> clazz) {
 		return (rs, rowNum) -> {
 			try {
 				ResultSetMetaData meta = rs.getMetaData();
 				if (meta.getColumnCount() == 1) {
-					return type.cast(getObject(type, rs, 1));
+					return clazz.cast(getObject(clazz, rs, 1));
 				} else {
-					// get all instance fields in the hierarchy
-					Map<String, Field> map = ReflectUtil.getFields(type, field -> {
-						int modifiers = field.getModifiers();
-						return !Modifier.isStatic(modifiers) && !Modifier.isTransient(modifiers);
-					});
-
-					// map column to field using ColumnLabel
-					T target = type.getConstructor().newInstance();
+					Map<String, Integer> map = new HashMap<>();
 					for (int i = 1; i <= meta.getColumnCount(); i++) {
-						String name = meta.getColumnLabel(i);
-						Field field = map.get(name);
-						if (field != null) {
-							field.set(target, getObject(field.getType(), rs, i));
-						}
+						map.put(meta.getColumnLabel(i), i);
 					}
-					return target;
+					return Reflect.create(clazz, Unchecked.biFunction((name, type) -> getObject(type, rs, map.get(name))));
 				}
 			} catch (ReflectiveOperationException e) {
 				throw new SQLException(e);
@@ -67,7 +57,7 @@ public interface RowMapper<T> {
 		};
 	}
 
-	private static Object getObject(Class<?> type, ResultSet rs, int index) throws SQLException {
+	private static Object getObject(Type type, ResultSet rs, int index) throws SQLException {
 		if (type == String.class) {
 			return rs.getString(index);
 		} else if (type == Integer.class) {

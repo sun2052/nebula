@@ -63,6 +63,15 @@ class UncheckedTest {
 	}
 
 	@Test
+	void testComparator() {
+		// ClassNotFoundException
+		Unchecked.comparator((String a, String b) -> {
+			Class.forName("java.lang.Object");
+			return a.compareTo(b);
+		});
+	}
+
+	@Test
 	void testSneakyThrow() {
 		// ClassNotFoundException
 		assertThrows(ClassNotFoundException.class, () -> Class.forName("not.found"));

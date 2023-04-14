@@ -1,7 +1,7 @@
 Nebula Web
 ==========
 
-Minimal Web Framework based on [Project Loom](https://wiki.openjdk.java.net/display/loom/Main)
+Minimal Web Framework based on [JEP 444: Virtual Threads](https://openjdk.org/jeps/444)
 
 * HTTP/1.1
 

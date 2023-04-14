@@ -1,5 +1,6 @@
 package org.byteinfo.util.function;
 
+import java.util.Comparator;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
@@ -90,6 +91,17 @@ public interface Unchecked {
 				runnable.run();
 			} catch (Exception e) {
 				sneakyThrow(e);
+			}
+		};
+	}
+
+	static <T> Comparator<T> comparator(CheckedComparator<T> comparator) {
+		return (o1, o2) -> {
+			try {
+				return comparator.compare(o1, o2);
+			} catch (Exception e) {
+				sneakyThrow(e);
+				return 0;
 			}
 		};
 	}

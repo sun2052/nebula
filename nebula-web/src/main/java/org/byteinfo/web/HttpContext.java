@@ -1,6 +1,8 @@
 package org.byteinfo.web;
 
+import org.byteinfo.util.function.Unchecked;
 import org.byteinfo.util.io.IOUtil;
+import org.byteinfo.util.reflect.Reflect;
 import org.byteinfo.util.text.RandomUtil;
 import org.byteinfo.util.time.WheelTimer;
 
@@ -8,7 +10,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.InetSocketAddress;
@@ -181,17 +182,7 @@ public class HttpContext {
 
 	public <T> T param(Class<T> clazz, boolean optional) {
 		try {
-			Object obj = clazz.getDeclaredConstructor().newInstance();
-			for (Class<?> current = clazz; current != Object.class; current = current.getSuperclass()) {
-				for (Field field : current.getDeclaredFields()) {
-					Object value = param(field.getName(), field.getGenericType(), optional);
-					if (value != null) {
-						field.setAccessible(true);
-						field.set(obj, value);
-					}
-				}
-			}
-			return (T) obj;
+			return Reflect.create(clazz, Unchecked.biFunction((name, type) -> param(name, type, optional)));
 		} catch (Exception e) {
 			throw new WebException(StatusCode.BAD_REQUEST, e);
 		}
