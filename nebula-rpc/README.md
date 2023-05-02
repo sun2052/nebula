@@ -1,11 +1,19 @@
 Nebula RPC
 ==========
 
-Lightweight RPC Framework
+Lightweight Network Communications and RPC Framework
 
 
-Module
-------
+Features
+--------
+
+* Lightweight: **25 KB**
+* Concise API
+* Modular Design
+
+
+Documentation
+-------------
 
 ### Socket
 A minimal framework for easy network communications.
@@ -23,11 +31,10 @@ Extra VM Options required for TCP Keep-Alive on Windows Platform
 ```
 
 ### RPC
-
 ```java
 // Service Definition
 public interface HelloService {
-    String hello(String name);
+	String hello(String name);
 }
 
 // Start RPC Server

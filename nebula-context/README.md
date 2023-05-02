@@ -4,19 +4,25 @@ Nebula Context
 Lightweight Dependency Injection ([JSR 330](https://www.jcp.org/en/jsr/detail?id=330)) Implementation
 
 
+Features
+--------
+
+* Lightweight: **15 KB**
+* Concise API
+* Simple Design
+
+
 Documentation
 -------------
 
-[Dependency Injection for Java (JSR 330)](https://javaee.github.io/javaee-spec/javadocs/javax/inject/package-summary.html)
+### [Dependency Injection for Java (JSR 330)](https://javaee.github.io/javaee-spec/javadocs/javax/inject/package-summary.html)
+* Default Scope: **Singleton**
+* Fields Injection: **YES**
+* Constructor Injection: **YES**
+* PostConstruct Support: **YES**
+* Methods Injection: **NO**
 
-* Default Scope: **@Singleton**
-* @PostConstruct Methods
-* **No Methods Injection**
-
-
-Usage
------
-
+### Usage
 ```java
 // initialize context
 Context context = new Context();

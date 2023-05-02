@@ -7,17 +7,18 @@ Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementa
 Features
 --------
 
-* concise, user-friendly API
-* console and file output with rolling support
-* dynamic configuration
+* Lightweight: **20 KB**
+* Concise API
+* Dynamic Configuration
+* Console and File output with Rolling support
 * SLF4J API implementation
-* lightweight, 19 KB
+* Simple Design: single static Logger
 
 
-Configuration
+Documentation
 -------------
 
-Syntax
+### Syntax
 ```
 [output[:options]]
 [output[;options]]
@@ -35,7 +36,7 @@ rolling = none, file output only
 backups = 30, file output only
 ```
 
-Apply Config
+### Apply Config
 ```
 # Java API
 Log.applyConfig("-Dnlog=/path/to/file.{}.log:rolling=daily,backups=60");
@@ -44,10 +45,7 @@ Log.applyConfig("-Dnlog=/path/to/file.{}.log:rolling=daily,backups=60");
 java -Dnlog=/path/to/file.{}.log:rolling=daily,backups=60 -jar app.jar
 ```
 
-
-Usage
------
-
+### Usage
 ```java
 Log.trace("Hello World.");
 Log.debug("Hello World.");

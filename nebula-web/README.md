@@ -1,15 +1,22 @@
 Nebula Web
 ==========
 
-Minimal Web Framework based on [JEP 444: Virtual Threads](https://openjdk.org/jeps/444)
-
-* HTTP/1.1
+Lightweight Web MVC Framework and HTTP Server built with [JEP 444: Virtual Threads](https://openjdk.org/jeps/444)
 
 
-Configuration
+Features
+--------
+
+* Lightweight: **40 KB**
+* Concise API: **MVC API** and **Script API**
+* Simple Design: **thread-per-request style** using **Virtual Threads**
+* HTTP Server: **HTTP/1.1** with **ETag**
+
+
+Documentation
 -------------
 
-Configurations are located in the classpath.
+### Configurations are located in the classpath.
 ```
 # default config
 org/byteinfo/web/application.properties
@@ -22,8 +29,8 @@ java -Dhttp.port=80 -jar app.jar
 ```
 
 
-Usage
------
+Quick Start
+-----------
 
 ### MVC API
 ```java
@@ -38,13 +45,22 @@ public class MainController {
 
 // Bootstrap
 new Server()
-.handler(MainController.class)
-.start();
+	.handler(MainController.class)
+	.start();
 ```
 
 ### Script API
 ```java
 new Server()
-.get("/", ctx -> "Hello, World!")
-.start();
+	.get("/", ctx -> "Hello, World!")
+	.start();
+```
+
+### Check the Result: `curl -i 127.0.0.1`
+```
+HTTP/1.1 200
+content-type: text/plain; charset=utf-8
+content-length: 13
+
+Hello, World!
 ```

@@ -363,7 +363,7 @@ public class Proxy<T> {
 			ClassDesc unboxType = UNBOX_MAP.get(type);
 			if (unboxType != null) {
 				code.checkcast(type);
-				code.invokevirtual(type, unboxType.descriptorString() + "Value", MethodTypeDesc.of(unboxType));
+				code.invokevirtual(type, unboxType.displayName() + "Value", MethodTypeDesc.of(unboxType));
 			}
 		}
 	}
