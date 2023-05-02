@@ -1,7 +1,8 @@
 package org.byteinfo.proxy;
 
 public class ProxyException extends RuntimeException {
-	public ProxyException() {}
+	public ProxyException() {
+	}
 
 	public ProxyException(String message) {
 		super(message);

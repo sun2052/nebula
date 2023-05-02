@@ -1,7 +1,5 @@
 package org.byteinfo.proxy;
 
-import org.objectweb.asm.Type;
-
 public class ProxyTarget {
 	public static Object proceed() {
 		throw new ProxyException();
@@ -11,15 +9,15 @@ public class ProxyTarget {
 		throw new ProxyException();
 	}
 
-	public static int argumentsCount() {
+	public static int argumentCount() {
 		throw new ProxyException();
 	}
 
-	public static Type[] argumentTypes() {
+	public static Class<?>[] argumentTypes() {
 		throw new ProxyException();
 	}
 
-	public static Type returnType() {
+	public static Class<?> returnType() {
 		throw new ProxyException();
 	}
 

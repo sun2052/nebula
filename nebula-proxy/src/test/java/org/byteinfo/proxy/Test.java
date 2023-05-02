@@ -2,7 +2,7 @@ package org.byteinfo.proxy;
 
 public class Test {
 	public static void main(String[] args) {
-		Pointcut pointcut = info -> info.name().equals("test");
+		Pointcut pointcut = method -> method.methodName().equalsString("test");
 		Target t = Proxy.of(Target.class).with(Aspect.of(pointcut, MyAdvice1.class), Aspect.of(pointcut, MyAdvice2.class)).instance();
 		System.out.println(">>> " + t.test("Hello"));
 	}

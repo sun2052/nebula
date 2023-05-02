@@ -19,13 +19,14 @@
 	</modules>
 
 	<properties>
-		<maven.compiler.release>21</maven.compiler.release>
+		<maven.compiler.source>21</maven.compiler.source>
+		<maven.compiler.target>21</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
 		<maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
 		<maven-source-plugin.version>3.2.1</maven-source-plugin.version>
-		<junit.version>5.9.2</junit.version>
+		<junit.version>5.9.3</junit.version>
 	</properties>
 
 	<build>
@@ -37,7 +38,6 @@
 				<configuration>
 					<compilerArgs>
 						<arg>-parameters</arg>
-						<arg>--enable-preview</arg>
 					</compilerArgs>
 				</configuration>
 			</plugin>

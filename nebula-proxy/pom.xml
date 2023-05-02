@@ -12,15 +12,24 @@
 
 	<artifactId>nebula-proxy</artifactId>
 
-	<properties>
-		<asm.version>9.5</asm.version>
-	</properties>
-
-	<dependencies>
-		<dependency>
-			<groupId>org.ow2.asm</groupId>
-			<artifactId>asm</artifactId>
-			<version>${asm.version}</version>
-		</dependency>
-	</dependencies>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<compilerArgs>
+						<arg>--add-exports</arg>
+						<arg>java.base/jdk.internal.classfile=ALL-UNNAMED</arg>
+						<arg>--add-exports</arg>
+						<arg>java.base/jdk.internal.classfile.instruction=ALL-UNNAMED</arg>
+						<arg>--add-exports</arg>
+						<arg>java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED</arg>
+						<arg>--add-exports</arg>
+						<arg>java.base/jdk.internal.classfile.attribute=ALL-UNNAMED</arg>
+					</compilerArgs>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
 </project>

@@ -1,13 +1,13 @@
 Nebula Proxy
 ============
 
-Lightweight [ASM-Based](https://asm.ow2.io/) Runtime Proxy Generator
+Lightweight Runtime Proxy Generator based on [JEP draft: Class-File API (Preview)](https://openjdk.org/jeps/8280389)
 
 
 Feature
 -------
 
-* Minimal Overhead: **140 KB**
+* Minimal Overhead: **15 KB**
 * Concise API: `Proxy.of(Target.class).with(aspects).instance()`
 * Simple Design: **Runtime Subclass Generation**
 
@@ -17,7 +17,7 @@ Documentation
 
 ### Terminology
 
-* Aspect:  a pointcut and advice pair
+* Aspect: a pointcut and advice pair
 * Pointcut: identify the method to be applied
 * Advice: custom logic to be applied
 
@@ -45,7 +45,7 @@ class Target {
 }
 
 // pointcut
-Pointcut pointcut = info -> info.name().equals("test");
+Pointcut pointcut = method -> method.methodName().equalsString("test");
 
 // advice
 class MyAdvice implements Advice {
