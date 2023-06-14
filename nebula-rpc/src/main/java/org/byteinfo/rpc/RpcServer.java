@@ -1,11 +1,12 @@
-package org.byteinfo.raft.rpc;
+package org.byteinfo.rpc;
 
-import org.byteinfo.raft.socket.Address;
-import org.byteinfo.raft.socket.Endpoint;
-import org.byteinfo.raft.socket.Message;
+import org.byteinfo.socket.Endpoint;
+import org.byteinfo.socket.Node;
 import org.byteinfo.util.function.Unchecked;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,27 +15,31 @@ public class RpcServer implements AutoCloseable {
 	private final Map<String, Object> serviceMap = new ConcurrentHashMap<>();
 	private volatile boolean started;
 
-	public RpcServer(Address address) {
+	public RpcServer(InetSocketAddress address) throws IOException {
 		endpoint = new Endpoint(address);
 	}
 
 	public void start() {
 		started = true;
-		endpoint.start();
-		Thread.startVirtualThread(Unchecked.runnable(() -> {
+		new Thread(Unchecked.runnable(() -> {
 			while (started) {
-				handleMessage(endpoint.receive());
+				var node = endpoint.accept();
+				Thread.startVirtualThread(Unchecked.runnable(() -> handleConnection(node)));
 			}
-		}));
+		})).start();
 	}
 
-	public void addService(Class<?> service, Object serviceImpl) {
+	public <T> void addService(Class<T> service, T serviceImpl) {
 		serviceMap.put(service.getName(), serviceImpl);
 	}
 
-	private void handleMessage(Message message) {
-		Thread.startVirtualThread(() -> {
-			var request = Serializer.deserialize(message.data(), RpcRequest.class);
+	private void handleConnection(Node node) throws IOException, InterruptedException {
+		while (true) {
+			var message = node.readMessage();
+			if (message == null) {
+				break;
+			}
+			var request = Serializer.deserialize(message.bytes(), RpcRequest.class);
 
 			try {
 				var obj = serviceMap.get(request.service());
@@ -43,20 +48,20 @@ public class RpcServer implements AutoCloseable {
 				}
 				var method = obj.getClass().getMethod(request.method(), request.params());
 				var result = method.invoke(obj, request.args());
-				endpoint.send(message.origin(), Serializer.serialize(new RpcResponse(request.id(), result, null)));
+				node.writeMessage(0, Serializer.serialize(new RpcResponse(request.id(), result, null)));
 			} catch (Exception e) {
 				Throwable t = e;
 				if (e instanceof InvocationTargetException && e.getCause() != null) {
 					t = e.getCause();
 				}
-				endpoint.send(message.origin(), Serializer.serialize(new RpcResponse(request.id(), null, String.valueOf(t))));
+				node.writeMessage(0, Serializer.serialize(new RpcResponse(request.id(), null, String.valueOf(t))));
 			}
-		});
+		}
 	}
 
 	@Override
 	public void close() throws Exception {
 		started = false;
-		endpoint.stop();
+		endpoint.close();
 	}
 }

@@ -1,10 +1,13 @@
-package org.byteinfo.raft.socket;
+package org.byteinfo.socket;
 
 import jdk.net.ExtendedSocketOptions;
 import org.byteinfo.logging.Log;
+import org.byteinfo.util.codec.ByteUtil;
 import org.byteinfo.util.function.CheckedBiFunction;
+import org.byteinfo.util.io.LimitedInputStream;
 import org.byteinfo.util.misc.Platform;
 
+import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,29 +30,27 @@ import java.util.concurrent.locks.ReentrantLock;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 
-public class Node {
+public class Node implements Closeable {
+	private static volatile int connectTimeoutMillis = 5000; // socket connect timeout in millis
+	private static volatile int reconnectDelayMillis = 5000; // reconnect delay in millis
+	private static volatile int bufferSize = 1024 * 1024 * 16; // send and receive buffer size in bytes
+	private static volatile int keepAliveIdleTime = 45; // max idle time in seconds before sending the probe
+	private static volatile int keepAliveProbeInterval = 5; // wait interval in seconds before sending another probe
+	private static volatile int keepAliveProbeCount = 3; // max probes count to be sent
+
+	private final AtomicBoolean connected = new AtomicBoolean();
+	private final AtomicBoolean connecting = new AtomicBoolean();
 	private final Lock readLock = new ReentrantLock();
 	private final Lock writeLock = new ReentrantLock();
-	private final Address address;
+	private final InetSocketAddress address;
 	private volatile Socket socket;
 
-	private volatile int connectTimeoutMillis = 5000; // socket connect timeout in millis
-	private volatile int reconnectDelayMillis = 5000; // reconnect delay in millis
-	private volatile int keepAliveIdleTime = 45; // max idle time in seconds before sending the probe
-	private volatile int keepAliveProbeInterval = 5; // wait interval in seconds before sending another probe
-	private volatile int keepAliveProbeCount = 3; // max probes count to be sent
-
-	private volatile AtomicBoolean connected = new AtomicBoolean();
-	private volatile AtomicBoolean connecting = new AtomicBoolean();
-
-	public Node(Address address) {
+	public Node(InetSocketAddress address) {
 		this.address = address;
 	}
 
-	public Node(Socket socket, Endpoint endpoint) throws IOException {
-		setConnectTimeout(endpoint.connectTimeoutMillis(), endpoint.reconnectDelayMillis());
-		setKeepAlive(endpoint.keepAliveIdleTime(), endpoint.keepAliveProbeInterval(), endpoint.keepAliveProbeCount());
-		this.address = new Address(socket.getInetAddress().getHostAddress(), socket.getPort());
+	public Node(Socket socket) throws IOException {
+		this.address = (InetSocketAddress) socket.getRemoteSocketAddress();
 		this.socket = initialize(socket);
 		connected.set(true);
 	}
@@ -64,18 +65,19 @@ public class Node {
 			try {
 				while (!connected.get()) {
 					try {
-						Log.info("Connecting to {}", address);
-						var target = new InetSocketAddress(address.host(), address.port());
+						Log.debug("Connecting to {}", address);
 						if (timeoutMillis > 0) {
 							timeoutMillis = Math.min(timeoutMillis, connectTimeoutMillis);
 						}
 						socket = new Socket();
-						socket.connect(target, timeoutMillis);
+						socket.setReceiveBufferSize(bufferSize);
+						socket.setSendBufferSize(bufferSize);
+						socket.connect(address, timeoutMillis);
 						connected.set(true);
 					} catch (SocketTimeoutException e) {
-						Log.info("Connecting to {} timed out.", address);
+						Log.debug("Connecting to {} timed out.", address);
 					} catch (Exception e) {
-						Log.info(e, "Connecting to {} failed.", address);
+						Log.debug(e, "Connecting to {} failed.", address);
 					}
 
 					if (connected.get()) {
@@ -84,7 +86,7 @@ public class Node {
 						if (timeoutMillis > 0 && deadline - System.currentTimeMillis() < reconnectDelayMillis) {
 							break;
 						} else {
-							Log.info("Trying to reconnect in {} seconds.", new DecimalFormat("#.##").format(reconnectDelayMillis / 1000.0));
+							Log.debug("Trying to reconnect in {} seconds.", new DecimalFormat("#.##").format(reconnectDelayMillis / 1000.0));
 							Thread.sleep(reconnectDelayMillis);
 						}
 					}
@@ -100,20 +102,105 @@ public class Node {
 		return disconnect(false);
 	}
 
-	public Node disconnect(boolean forceClose) throws IOException {
+	public Node disconnect(boolean force) throws IOException {
 		if (connected.compareAndSet(true, false)) {
-			if (forceClose) {
+			if (force) {
 				// socket.close() will send an RST instead of a FIN to avoid an unnecessary half-close
+				// https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html
 				socket.setSoLinger(true, 0);
 			}
 			// Linux: net.ipv4.tcp_fin_timeout = 60 (default)
 			// This specifies how many seconds to wait for a final FIN packet before the socket is forcibly closed.
 			String socketString = socket.toString();
-			socket.close(); // send FIN or RST if forceClose
+			socket.close(); // send FIN or RST if force=true
 			socket = null;
-			Log.info("Disconnected(forceClose={}): {}", forceClose, socketString);
+			Log.debug("Disconnected(force={}): {}", force, socketString);
 		}
 		return this;
+	}
+
+	@Override
+	public void close() throws IOException {
+		disconnect();
+	}
+
+	/**
+	 * Reads the message from the remote node.
+	 *
+	 * @return the message read or null if connection is closed
+	 * @throws EOFException if end of stream is reached unexpectedly
+	 * @throws IOException if an io error occurs
+	 * @throws InterruptedException if current thread is interrupted
+	 */
+	public Message readMessage() throws IOException, InterruptedException {
+		ensureConnected();
+		readLock.lockInterruptibly();
+		try {
+			var in = socket.getInputStream();
+			var bytes = in.readNBytes(Message.TYPE_SIZE);
+			if (bytes.length == 0) {
+				return null;
+			}
+			if (bytes.length != Message.TYPE_SIZE) {
+				throw new EOFException();
+			}
+			var type = ByteUtil.asInt(bytes);
+			var length = ByteUtil.asLong(readExact(in, Message.LENGTH_SIZE));
+			return new Message(type, length, new LimitedInputStream(in, length), (InetSocketAddress) socket.getRemoteSocketAddress());
+		} finally {
+			readLock.unlock();
+		}
+	}
+
+	/**
+	 * Writes the type and data of the message to the remote node.
+	 *
+	 * @param type data type
+	 * @param dataList byte arrays of the message data
+	 * @throws IOException if an io error occurs
+	 * @throws InterruptedException if current thread is interrupted
+	 */
+	public void writeMessage(int type, byte[]... dataList) throws IOException, InterruptedException {
+		ensureConnected();
+		writeLock.lockInterruptibly();
+		try {
+			var out = socket.getOutputStream();
+			out.write(ByteUtil.asBytes(type));
+			long length = 0;
+			for (byte[] data : dataList) {
+				length += data.length;
+			}
+			out.write(ByteUtil.asBytes(length));
+			for (byte[] data : dataList) {
+				out.write(data);
+			}
+			out.flush();
+		} finally {
+			writeLock.unlock();
+		}
+	}
+
+	/**
+	 * Writes the type and data of the message to the remote node.
+	 *
+	 * @param type data type
+	 * @param length length of the data
+	 * @param in input stream for reading the data
+	 * @throws IOException if an io error occurs
+	 * @throws InterruptedException if current thread is interrupted
+	 */
+	public void writeMessage(int type, long length, InputStream in) throws IOException, InterruptedException {
+		ensureConnected();
+		writeLock.lockInterruptibly();
+		try {
+			var out = socket.getOutputStream();
+			out.write(ByteUtil.asBytes(type));
+			out.write(ByteUtil.asBytes(length));
+			in.transferTo(out);
+			out.flush();
+		} finally {
+			writeLock.unlock();
+		}
 	}
 
 	/**
@@ -121,7 +208,7 @@ public class Node {
 	 *
 	 * @param maxLength the max number of bytes to read
 	 * @return a byte array containing the bytes read
-	 * @throws IOException if an io exception occurs
+	 * @throws IOException if an io error occurs
 	 */
 	public byte[] readMax(int maxLength) throws IOException, InterruptedException {
 		ensureConnected();
@@ -138,23 +225,26 @@ public class Node {
 	 *
 	 * @param exactLength the exact number of bytes to read
 	 * @return a byte array containing the bytes read
-	 * @throws EOFException if end of stream is reached
-	 * @throws IOException if an io exception occurs
+	 * @throws EOFException if end of stream is reached unexpectedly
+	 * @throws IOException if an io error occurs
 	 */
 	public byte[] readExact(int exactLength) throws IOException, InterruptedException {
 		ensureConnected();
 		readLock.lockInterruptibly();
 		try {
-			byte[] data = readMax(exactLength);
-			if (data.length != exactLength) {
-				throw new EOFException();
-			}
-			return data;
+			return readExact(socket.getInputStream(), exactLength);
 		} finally {
 			readLock.unlock();
 		}
 	}
 
+	/**
+	 * Writes all bytes of the specified byte arrays.
+	 *
+	 * @param dataList byte arrays
+	 * @throws IOException if an io error occurs
+	 * @throws InterruptedException if current thread is interrupted
+	 */
 	public void write(byte[]... dataList) throws IOException, InterruptedException {
 		ensureConnected();
 		writeLock.lockInterruptibly();
@@ -169,6 +259,13 @@ public class Node {
 		}
 	}
 
+	/**
+	 * Writes all bytes of the specified input stream.
+	 *
+	 * @param in input stream
+	 * @throws IOException if an io error occurs
+	 * @throws InterruptedException if current thread is interrupted
+	 */
 	public void write(InputStream in) throws IOException, InterruptedException {
 		ensureConnected();
 		writeLock.lockInterruptibly();
@@ -181,27 +278,50 @@ public class Node {
 		}
 	}
 
-	public Node setConnectTimeout(int connectTimeoutMillis, int reconnectDelayMillis) {
-		this.connectTimeoutMillis = connectTimeoutMillis;
-		this.reconnectDelayMillis = reconnectDelayMillis;
-		return this;
+	public static void setConnectTimeout(int connectTimeoutMillis, int reconnectDelayMillis) {
+		Node.connectTimeoutMillis = connectTimeoutMillis;
+		Node.reconnectDelayMillis = reconnectDelayMillis;
 	}
 
-	public Node setKeepAlive(int keepAliveIdleTime, int keepAliveProbeInterval, int keepAliveProbeCount) throws IOException {
-		this.keepAliveIdleTime = keepAliveIdleTime;
-		this.keepAliveProbeInterval = keepAliveProbeInterval;
-		this.keepAliveProbeCount = keepAliveProbeCount;
-		if (connected.get()) {
-			setKeepAliveOptions(socket);
-		}
-		return this;
+	public static void setBufferSize(int bufferSize) {
+		Node.bufferSize = bufferSize;
+	}
+
+	public static void setKeepAlive(int keepAliveIdleTime, int keepAliveProbeInterval, int keepAliveProbeCount) throws IOException {
+		Node.keepAliveIdleTime = keepAliveIdleTime;
+		Node.keepAliveProbeInterval = keepAliveProbeInterval;
+		Node.keepAliveProbeCount = keepAliveProbeCount;
+	}
+
+	public static int getConnectTimeoutMillis() {
+		return connectTimeoutMillis;
+	}
+
+	public static int getReconnectDelayMillis() {
+		return reconnectDelayMillis;
+	}
+
+	public static int getBufferSize() {
+		return bufferSize;
+	}
+
+	public static int getKeepAliveIdleTime() {
+		return keepAliveIdleTime;
+	}
+
+	public static int getKeepAliveProbeInterval() {
+		return keepAliveProbeInterval;
+	}
+
+	public static int getKeepAliveProbeCount() {
+		return keepAliveProbeCount;
 	}
 
 	public boolean isConnected() {
 		return connected.get();
 	}
 
-	public Address address() {
+	public InetSocketAddress address() {
 		return address;
 	}
 
@@ -215,7 +335,7 @@ public class Node {
 	}
 
 	private Socket initialize(Socket socket) throws IOException {
-		Log.info("Connected: {}", socket);
+		Log.debug("Connected: {}", socket);
 		socket.setTcpNoDelay(true);
 		socket.setKeepAlive(true);
 		setKeepAliveOptions(socket);
@@ -258,10 +378,10 @@ public class Node {
 		int socketFd = (int) getFieldValue.apply("fd", target);
 
 		// invoke windows native api
-		try (Arena arena = Arena.openConfined()) {
+		try (Arena arena = Arena.ofConfined()) {
 			// get method handle
 			// https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-setsockopt
-			var symbol = SymbolLookup.libraryLookup("Ws2_32.dll", arena.scope()).find("setsockopt").orElseThrow();
+			var symbol = SymbolLookup.libraryLookup("Ws2_32.dll", arena).find("setsockopt").orElseThrow();
 			var function = FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS, JAVA_INT);
 			MethodHandle methodHandle = Linker.nativeLinker().downcallHandle(symbol, function);
 
@@ -287,5 +407,13 @@ public class Node {
 		if (!connected.get()) {
 			throw new IllegalStateException("Node is not connected.");
 		}
+	}
+
+	private byte[] readExact(InputStream in, int length) throws IOException {
+		var bytes = in.readNBytes(length);
+		if (bytes.length != length) {
+			throw new EOFException();
+		}
+		return bytes;
 	}
 }

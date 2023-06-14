@@ -14,6 +14,7 @@
 		<module>nebula-context</module>
 		<module>nebula-proxy</module>
 		<module>nebula-utils</module>
+		<module>nebula-socket</module>
 		<module>nebula-rpc</module>
 		<module>nebula-web</module>
 	</modules>
@@ -24,8 +25,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
-		<maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
-		<maven-source-plugin.version>3.2.1</maven-source-plugin.version>
+		<maven-source-plugin.version>3.3.0</maven-source-plugin.version>
 		<junit.version>5.9.3</junit.version>
 	</properties>
 
@@ -40,11 +40,6 @@
 						<arg>-parameters</arg>
 					</compilerArgs>
 				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<version>${maven-jar-plugin.version}</version>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

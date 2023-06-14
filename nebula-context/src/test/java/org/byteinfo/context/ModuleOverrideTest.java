@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ModuleOverrideTest {
 	@Test
-	void dependencyOverridenByModule() {
+	void dependencyOverriddenByModule() {
 		Context context = new Context(new PlainStubOverrideModule());
 		assertEquals(PlainStub.class, context.instance(Plain.class).getClass());
 	}

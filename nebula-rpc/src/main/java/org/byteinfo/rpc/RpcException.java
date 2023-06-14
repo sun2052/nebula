@@ -1,4 +1,4 @@
-package org.byteinfo.raft.rpc;
+package org.byteinfo.rpc;
 
 public class RpcException extends RuntimeException {
 	public RpcException(String message) {

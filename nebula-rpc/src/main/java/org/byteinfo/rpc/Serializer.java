@@ -1,4 +1,4 @@
-package org.byteinfo.raft.rpc;
+package org.byteinfo.rpc;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;

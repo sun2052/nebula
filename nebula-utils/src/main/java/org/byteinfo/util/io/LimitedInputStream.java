@@ -1,5 +1,6 @@
 package org.byteinfo.util.io;
 
+import java.io.EOFException;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,6 +13,10 @@ public class LimitedInputStream extends FilterInputStream {
 		this.left = limit;
 	}
 
+	public long getLeft() {
+		return left;
+	}
+
 	@Override
 	public int read() throws IOException {
 		if (left == 0) {
@@ -20,6 +25,9 @@ public class LimitedInputStream extends FilterInputStream {
 		int result = in.read();
 		if (result != -1) {
 			left--;
+		}
+		if (result == -1 && left != 0) {
+			throw new EOFException();
 		}
 		return result;
 	}
@@ -33,6 +41,9 @@ public class LimitedInputStream extends FilterInputStream {
 		int result = in.read(b, off, len);
 		if (result != -1) {
 			left -= result;
+		}
+		if (result == -1 && left != 0) {
+			throw new EOFException();
 		}
 		return result;
 	}

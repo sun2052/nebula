@@ -12,7 +12,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -314,7 +313,7 @@ public class HttpContext {
 		if (address != null) {
 			return address.split(",", 2)[0];
 		} else {
-			return ((InetSocketAddress) socket.getRemoteSocketAddress()).getAddress().getHostAddress();
+			return socket.getInetAddress().getHostAddress();
 		}
 	}
 

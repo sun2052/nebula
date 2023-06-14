@@ -27,7 +27,7 @@ public interface HttpCodec {
 	 *
 	 * @param in raw HTTP request
 	 * @return request or null if connection is closed
-	 * @throws IOException if an io exception occurs
+	 * @throws IOException if an io error occurs
 	 * @throws WebException if the request can't be parsed
 	 */
 	static Request parseRequest(InputStream in) throws IOException {
@@ -97,7 +97,7 @@ public interface HttpCodec {
 	 *
 	 * @param request the HTTP request
 	 * @return a map of the param name and the corresponding param value list
-	 * @throws IOException if an io exception occurs
+	 * @throws IOException if an io error occurs
 	 * @throws WebException if the request can't be parsed
 	 */
 	static Map<String, List<String>> parseParams(Request request) throws IOException {
@@ -142,7 +142,7 @@ public interface HttpCodec {
 	 * @param cookies response cookies or null if not required
 	 * @param data response body or null if not required
 	 * @param length response body length
-	 * @throws IOException if an io exception occurs
+	 * @throws IOException if an io error occurs
 	 */
 	static void send(OutputStream out, int status, Headers headers, Collection<Cookie> cookies, InputStream data, long length) throws IOException {
 		// send response status line
@@ -187,7 +187,7 @@ public interface HttpCodec {
 	 *
 	 * @param out response output stream
 	 * @param status response status
-	 * @throws IOException if an io exception occurs
+	 * @throws IOException if an io error occurs
 	 */
 	static void send(OutputStream out, int status) throws IOException {
 		send(out, status, null, null, null, 0);
@@ -198,7 +198,7 @@ public interface HttpCodec {
 	 *
 	 * @param in data source
 	 * @return a line of ASCII characters or null if EOF is reached
-	 * @throws IOException if an io exception occurs
+	 * @throws IOException if an io error occurs
 	 */
 	static String readLine(InputStream in) throws IOException {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream(1024 * 8);

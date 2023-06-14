@@ -61,7 +61,7 @@ public class Context {
 				if (method.isAnnotationPresent(Provides.class)) {
 					Key<?> key = Key.of(method.getReturnType(), getQualifier(method.getReturnType(), method.getDeclaredAnnotations()));
 					if (providers.containsKey(key)) {
-						throw new ContextException(key + ": Multiple @Provides methods are not supported.");
+						throw new ContextException(key + ": Multiple @Provides methods with same type are not supported.");
 					}
 					method.setAccessible(true);
 					Provider<?>[] paramProviders = getParamProviders(key, method, null);

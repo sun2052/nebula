@@ -10,11 +10,7 @@
 		<version>1.0-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>nebula-rpc</artifactId>
-
-	<properties>
-		<kryo.version>5.5.0</kryo.version>
-	</properties>
+	<artifactId>nebula-socket</artifactId>
 
 	<build>
 		<plugins>
@@ -33,13 +29,13 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.byteinfo</groupId>
-			<artifactId>nebula-socket</artifactId>
+			<artifactId>nebula-logging</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>com.esotericsoftware</groupId>
-			<artifactId>kryo</artifactId>
-			<version>${kryo.version}</version>
+			<groupId>org.byteinfo</groupId>
+			<artifactId>nebula-utils</artifactId>
+			<version>${project.version}</version>
 		</dependency>
 	</dependencies>
 </project>

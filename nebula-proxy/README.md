@@ -20,6 +20,13 @@ Documentation
 * Pointcut: identify the method to be applied
 * Advice: custom logic to be applied
 
+### Compile Time and Run Time Options (Class-File API)
+```
+--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED
+--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED
+--add-exports=java.base/jdk.internal.classfile.attribute=ALL-UNNAMED
+```
+
 ### Usage
 ```java
 Proxy.of(Target.class) // specify proxy target

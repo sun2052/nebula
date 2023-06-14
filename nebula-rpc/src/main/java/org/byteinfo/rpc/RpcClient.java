@@ -1,13 +1,12 @@
-package org.byteinfo.raft.rpc;
+package org.byteinfo.rpc;
 
 import org.byteinfo.logging.Log;
-import org.byteinfo.raft.socket.Address;
-import org.byteinfo.raft.socket.Node;
-import org.byteinfo.util.codec.ByteUtil;
+import org.byteinfo.socket.Node;
 import org.byteinfo.util.function.Unchecked;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,19 +20,21 @@ public class RpcClient implements AutoCloseable {
 
 	private volatile boolean started;
 
-	public RpcClient(Address remoteAddress) {
+	public RpcClient(InetSocketAddress remoteAddress) {
 		node = new Node(remoteAddress);
 	}
 
-	public void connect() throws IOException, InterruptedException {
+	public RpcClient connect() throws IOException, InterruptedException {
 		started = true;
 		node.connect();
 		Thread.startVirtualThread(() -> {
 			while (started) {
 				try {
-					var length = ByteUtil.asInt(node.readExact(Integer.BYTES));
-					var data = node.readExact(length);
-					var response = Serializer.deserialize(data, RpcResponse.class);
+					var message = node.readMessage();
+					if (message == null) {
+						break;
+					}
+					var response = Serializer.deserialize(message.bytes(), RpcResponse.class);
 					var future = map.get(response.id());
 					if (future != null) {
 						future.set(response);
@@ -46,13 +47,13 @@ public class RpcClient implements AutoCloseable {
 				}
 			}
 		});
+		return this;
 	}
 
 	public <T> T of(Class<T> serviceInterface) {
 		return (T) Proxy.newProxyInstance(serviceInterface.getClassLoader(), new Class<?>[] {serviceInterface}, (proxy, method, args) -> {
 			var request = new RpcRequest(ID_GENERATOR.incrementAndGet(), serviceInterface.getName(), method.getName(), method.getParameterTypes(), args);
-			var data = Serializer.serialize(request);
-			node.write(ByteUtil.asBytes(data.length), data);
+			node.writeMessage(0, Serializer.serialize(request));
 			var future = new RpcFuture<RpcResponse>();
 			map.put(request.id(), future);
 			var response = future.get();

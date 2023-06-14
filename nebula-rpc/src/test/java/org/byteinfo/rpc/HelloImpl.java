@@ -1,4 +1,4 @@
-package org.byteinfo.raft.rpc;
+package org.byteinfo.rpc;
 
 import org.byteinfo.util.function.Unchecked;
 
@@ -10,7 +10,7 @@ public class HelloImpl implements HelloService {
 		var n = ThreadLocalRandom.current().nextInt(1000);
 		Unchecked.runnable(() -> Thread.sleep(n)).run();
 		if (n > 900) {
-			throw new RuntimeException("timeout");
+			throw new RuntimeException("expected runtime exception");
 		}
 		return "Hello " + name;
 	}

@@ -3,7 +3,7 @@ package org.byteinfo.util.misc;
 import java.util.Locale;
 
 public enum Platform {
-	WINDOWS, LINUX, MAC_OS, OTHER;
+	WINDOWS, LINUX, MAC_OS, UNKNOWN;
 
 	private static final Platform current;
 
@@ -16,7 +16,7 @@ public enum Platform {
 		} else if (name.contains("mac os")) {
 			current = MAC_OS;
 		} else {
-			current = OTHER;
+			current = UNKNOWN;
 		}
 	}
 

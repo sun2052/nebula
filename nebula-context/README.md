@@ -24,12 +24,23 @@ Documentation
 
 ### Usage
 ```java
+// config: map an interface to its implementation
+class Config {
+	@Provides
+	DataSource dataSource() {
+		return JdbcConnectionPool.create("jdbc:h2:~/test", "sa", "sa");
+	}
+}
+
 // initialize context
-Context context = new Context();
+Context context = new Context(new Config());
 
 // get an instance of A
 A a = context.instance(A.class);
 
 // get a provider of A
 Provider<A> provider = context.provider(A.class);
+
+// get an instance of DataSource implementation
+JdbcConnectionPool ds = context.instance(DataSource.class);
 ```

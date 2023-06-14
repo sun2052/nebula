@@ -1,4 +1,4 @@
-package org.byteinfo.raft.rpc;
+package org.byteinfo.rpc;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;

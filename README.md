@@ -65,8 +65,11 @@ Lightweight Dynamic Proxy Generator using [JEP draft: Class-File API (Preview)](
 ### [Nebula Utils](nebula-utils)
 Lightweight Common Utilities
 
+### [Nebula Socket](nebula-socket)
+Lightweight Distributed Network Communication Framework
+
 ### [Nebula RPC](nebula-rpc)
-Lightweight Network Communications and RPC Framework
+Lightweight Remote Procedure Call (RPC) Framework
 
 ### [Nebula Web](nebula-web)
 Lightweight Web MVC Framework and HTTP Server built with [JEP 444: Virtual Threads](https://openjdk.org/jeps/444)

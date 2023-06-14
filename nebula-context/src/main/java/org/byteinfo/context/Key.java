@@ -21,7 +21,7 @@ public record Key<T>(Class<T> type, Class<? extends Annotation> qualifier, Strin
 	/**
 	 * Gets the key for a given type and qualifier annotation type.
 	 *
-	 * @param type      target type
+	 * @param type target type
 	 * @param qualifier qualifier type
 	 * @return key
 	 */
@@ -43,7 +43,7 @@ public record Key<T>(Class<T> type, Class<? extends Annotation> qualifier, Strin
 	/**
 	 * Gets the key for a given type and qualifier annotation.
 	 *
-	 * @param type      target type
+	 * @param type target type
 	 * @param qualifier qualifier annotation
 	 * @return key
 	 */
