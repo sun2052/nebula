@@ -3,32 +3,20 @@ package org.byteinfo.socket;
 import jdk.net.ExtendedSocketOptions;
 import org.byteinfo.logging.Log;
 import org.byteinfo.util.codec.ByteUtil;
-import org.byteinfo.util.function.CheckedBiFunction;
 import org.byteinfo.util.io.LimitedInputStream;
-import org.byteinfo.util.misc.Platform;
 
 import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
-import java.lang.foreign.Linker;
-import java.lang.foreign.SymbolLookup;
-import java.lang.invoke.MethodHandle;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketImpl;
 import java.net.SocketTimeoutException;
 import java.text.DecimalFormat;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import static java.lang.foreign.ValueLayout.ADDRESS;
-import static java.lang.foreign.ValueLayout.JAVA_INT;
 
 public class Node implements Closeable {
 	private static volatile int connectTimeoutMillis = 5000; // socket connect timeout in millis
@@ -349,57 +337,6 @@ public class Node implements Closeable {
 			socket.setOption(ExtendedSocketOptions.TCP_KEEPIDLE, keepAliveIdleTime);
 			socket.setOption(ExtendedSocketOptions.TCP_KEEPINTERVAL, keepAliveProbeInterval);
 			socket.setOption(ExtendedSocketOptions.TCP_KEEPCOUNT, keepAliveProbeCount);
-		} else {
-			if (Platform.isWindows()) {
-				try {
-					setKeepAliveOptionsForWindows(socket);
-				} catch (Throwable t) {
-					throw new RuntimeException(t);
-				}
-			} else {
-				throw new RuntimeException("Keep-Alive Options are not supported.");
-			}
-		}
-	}
-
-	// These options are available starting with Windows 10, version 1709.
-	// --enable-native-access=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED
-	private void setKeepAliveOptionsForWindows(Socket socket) throws Throwable {
-		// get native socket fd by deep reflection: Socket.impl -> SocketImpl.getFileDescriptor() -> FileDescriptor.fd
-		CheckedBiFunction<String, Object, Object> getFieldValue = (name, obj) -> {
-			var field = obj.getClass().getDeclaredField(name);
-			field.setAccessible(true);
-			return field.get(obj);
-		};
-		Object target = getFieldValue.apply("impl", socket);
-		var method = SocketImpl.class.getDeclaredMethod("getFileDescriptor");
-		method.setAccessible(true);
-		target = method.invoke(target);
-		int socketFd = (int) getFieldValue.apply("fd", target);
-
-		// invoke windows native api
-		try (Arena arena = Arena.ofConfined()) {
-			// get method handle
-			// https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-setsockopt
-			var symbol = SymbolLookup.libraryLookup("Ws2_32.dll", arena).find("setsockopt").orElseThrow();
-			var function = FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS, JAVA_INT);
-			MethodHandle methodHandle = Linker.nativeLinker().downcallHandle(symbol, function);
-
-			// invoke method handle
-			// https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-tcp-socket-options
-			final int IPPROTO_TCP = 6;
-			final int TCP_KEEPIDLE = 3;
-			final int TCP_KEEPCNT = 16;
-			final int TCP_KEEPINTVL = 17;
-			int optionValueByteSize = (int) JAVA_INT.byteSize();
-			for (Map.Entry<Integer, Integer> entry : Map.of(TCP_KEEPIDLE, keepAliveIdleTime, TCP_KEEPCNT, keepAliveProbeCount, TCP_KEEPINTVL, keepAliveProbeInterval).entrySet()) {
-				int optionName = entry.getKey();
-				var optionValue = arena.allocate(JAVA_INT, entry.getValue());
-				int ret = (int) methodHandle.invoke(socketFd, IPPROTO_TCP, optionName, optionValue, optionValueByteSize);
-				if (ret != 0) {
-					throw new RuntimeException("setsockopt() failed: ret=" + ret);
-				}
-			}
 		}
 	}
 

@@ -12,22 +12,6 @@ Features
 * Modular Design
 
 
-Documentation
--------------
-
-### Required VM Options (Foreign Function & Memory API)
-```
---enable-preview
-```
-
-### Extra VM Options (Windows Only for TCP Keep-Alive)
-```
---enable-native-access=ALL-UNNAMED
---add-opens=java.base/java.net=ALL-UNNAMED
---add-opens=java.base/java.io=ALL-UNNAMED
-```
-
-
 Quick Start
 -----------
 
