@@ -9,9 +9,10 @@ public class Endpoint implements Closeable {
 	private final ServerSocket serverSocket;
 
 	public Endpoint(InetSocketAddress address) throws IOException {
-		serverSocket = new ServerSocket(address.getPort());
+		serverSocket = new ServerSocket();
 		serverSocket.setReuseAddress(true);
 		serverSocket.setReceiveBufferSize(Node.getBufferSize());
+		serverSocket.bind(address);
 	}
 
 	public Node accept() throws IOException {

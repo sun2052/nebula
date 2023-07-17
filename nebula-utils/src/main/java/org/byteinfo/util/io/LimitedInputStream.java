@@ -1,72 +1,62 @@
 package org.byteinfo.util.io;
 
-import java.io.EOFException;
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class LimitedInputStream extends FilterInputStream {
-	private long left;
+public class LimitedInputStream extends InputStream {
+	protected InputStream in;
+	protected long limit;
 
 	public LimitedInputStream(InputStream in, long limit) {
-		super(in);
-		this.left = limit;
-	}
-
-	public long getLeft() {
-		return left;
+		this.in = in;
+		this.limit = limit;
 	}
 
 	@Override
 	public int read() throws IOException {
-		if (left == 0) {
+		if (limit == 0) {
 			return -1;
 		}
 		int result = in.read();
 		if (result != -1) {
-			left--;
+			limit--;
 		}
-		if (result == -1 && left != 0) {
-			throw new EOFException();
+		if (result == -1 && limit > 0) {
+			throw new IOException("unexpected end of stream");
 		}
 		return result;
 	}
 
 	@Override
 	public int read(byte[] b, int off, int len) throws IOException {
-		if (left == 0) {
+		if (limit == 0) {
 			return -1;
 		}
-		len = (int) Math.min(len, left);
+		len = (int) Math.min(len, limit);
 		int result = in.read(b, off, len);
 		if (result != -1) {
-			left -= result;
+			limit -= result;
 		}
-		if (result == -1 && left != 0) {
-			throw new EOFException();
+		if (result == -1 && limit > 0) {
+			throw new IOException("unexpected end of stream");
 		}
 		return result;
 	}
 
 	@Override
 	public long skip(long n) throws IOException {
-		long skipped = in.skip(Math.min(n, left));
-		left -= skipped;
+		long skipped = in.skip(Math.min(n, limit));
+		limit -= skipped;
 		return skipped;
 	}
 
 	@Override
 	public int available() throws IOException {
-		return (int) Math.min(in.available(), left);
+		return (int) Math.min(in.available(), limit);
 	}
 
 	@Override
 	public void close() throws IOException {
-		left = 0;
-	}
-
-	@Override
-	public boolean markSupported() {
-		return false;
+		limit = 0;
 	}
 }

@@ -5,6 +5,7 @@ public interface HeaderName {
 	String CONTENT_TYPE = "content-type";
 	String CONTENT_LENGTH = "content-length";
 	String CONTENT_DISPOSITION = "content-disposition";
+	String TRANSFER_ENCODING = "transfer-encoding";
 	String CONNECTION = "connection";
 	String LOCATION = "location";
 	String COOKIE = "cookie";

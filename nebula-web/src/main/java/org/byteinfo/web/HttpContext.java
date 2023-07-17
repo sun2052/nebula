@@ -15,19 +15,17 @@ import java.lang.reflect.Type;
 import java.net.Socket;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class HttpContext {
-	public static final AtomicLong ID_GENERATOR = new AtomicLong();
 	public static final Map<String, Session> SESSIONS = new ConcurrentHashMap<>(AppConfig.get().getInt("session.capacity"));
-	public static final long SESSION_TIMEOUT = AppConfig.get().getInt("session.timeout") * 60 * 1000L;
+	public static final int SESSION_TIMEOUT = AppConfig.get().getInt("session.timeout") * 60 * 1000;
 	public static final int SESSION_ID_LENGTH = AppConfig.get().getInt("session.length");
 	public static final String SESSION_COOKIE_NAME = AppConfig.get().get("session.name");
 	public static final String CONTEXT_PATH = AppConfig.get().get("http.contextPath");
@@ -35,33 +33,30 @@ public class HttpContext {
 	private final long id;
 	private final Socket socket;
 	private final OutputStream out;
+
+	// request
 	private final Request request;
 	private final String path;
 	private String securityAttribute;
 	private Map<String, Cookie> cookies;
 	private Map<String, List<String>> params;
+	private Map<String, List<Upload>> uploads;
 	private Session session;
+
+	// response
 	private int responseStatus = StatusCode.OK;
 	private String responseType = ContentType.HTML;
 	private Headers responseHeaders = new Headers();
 	private Map<String, Cookie> responseCookies = new LinkedHashMap<>();
-	private long responseLength;
+	private long responseLength = -1;
 	private boolean committed;
 
-	private HttpContext(long id, Socket socket, OutputStream out, Request request, String path) {
+	public HttpContext(long id, Socket socket, OutputStream out, Request request) {
 		this.id = id;
 		this.socket = socket;
 		this.out = out;
 		this.request = request;
-		this.path = path;
-	}
-
-	public static HttpContext of(Socket socket, InputStream in, OutputStream out) throws IOException {
-		Request request = HttpCodec.parseRequest(in);
-		if (request == null) {
-			return null;
-		}
-		return new HttpContext(ID_GENERATOR.incrementAndGet(), socket, out, request, request.path().substring(CONTEXT_PATH.length()));
+		this.path = request.path().substring(CONTEXT_PATH.length());
 	}
 
 
@@ -69,6 +64,10 @@ public class HttpContext {
 
 	public long id() {
 		return id;
+	}
+
+	public Socket socket() {
+		return socket;
 	}
 
 	public String method() {
@@ -104,13 +103,14 @@ public class HttpContext {
 
 	public Map<String, List<String>> params() throws IOException {
 		if (params == null) {
-			params = HttpCodec.parseParams(request);
+			uploads = new HashMap<>();
+			params = HttpCodec.parseParams(request, uploads);
 		}
 		return params;
 	}
 
 	public List<String> params(String name) throws IOException {
-		return params().getOrDefault(name, Collections.emptyList());
+		return params().getOrDefault(name, List.of());
 	}
 
 	public String param(String name) throws IOException {
@@ -230,6 +230,20 @@ public class HttpContext {
 		throw new IllegalArgumentException("Unsupported type: " + targetType);
 	}
 
+	public Map<String, List<Upload>> files() throws IOException {
+		params();
+		return uploads;
+	}
+
+	public List<Upload> files(String name) throws IOException {
+		return files().getOrDefault(name, List.of());
+	}
+
+	public Upload file(String name) throws IOException {
+		List<Upload> list = files().get(name);
+		return list == null ? null : list.get(0);
+	}
+
 	public InputStream body() {
 		return request.body();
 	}
@@ -284,7 +298,7 @@ public class HttpContext {
 	}
 
 	public boolean xhr() {
-		return "XMLHttpRequest".equalsIgnoreCase(request.headers().get(HeaderName.REQUESTED_WITH));
+		return HeaderValue.XML_HTTP_REQUEST.equals(request.headers().get(HeaderName.REQUESTED_WITH));
 	}
 
 	public String host() {
@@ -389,7 +403,13 @@ public class HttpContext {
 		commit(null);
 	}
 
+	public void download(String filename, byte[] data) throws Exception {
+		responseLength = data.length;
+		download(filename, new ByteArrayInputStream(data));
+	}
+
 	public void download(String filename, InputStream stream) throws Exception {
+		responseType = ContentType.BINARY;
 		String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8);
 		responseHeaders.set(HeaderName.CONTENT_DISPOSITION, String.format("attachment; filename*=%s''%s", StandardCharsets.UTF_8.name(), encoded));
 		commit(stream);
@@ -404,6 +424,7 @@ public class HttpContext {
 		InputStream in;
 		if (result == null) {
 			in = null;
+			responseLength = 0;
 		} else if (result instanceof Result data) {
 			responseStatus = data.status();
 			responseType = data.type();
@@ -439,7 +460,7 @@ public class HttpContext {
 
 		// send response
 		if (!committed) {
-			if (responseLength > 0) {
+			if (responseLength != 0) {
 				responseHeaders.set(HeaderName.CONTENT_TYPE, responseType);
 			}
 			HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), in, responseLength);

@@ -7,6 +7,7 @@ import org.byteinfo.util.function.Unchecked;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -14,23 +15,23 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Server extends Context {
 	private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
-
-	private List<CheckedConsumer<Server>> onStartHandlers = new ArrayList<>();
-	private List<CheckedConsumer<Server>> onStopHandlers = new ArrayList<>();
+	private final List<CheckedConsumer<Server>> onStartHandlers = new ArrayList<>();
+	private final List<CheckedConsumer<Server>> onStopHandlers = new ArrayList<>();
 
 	// HTTP Handlers: path -> (method -> handler)
 	private final Map<String, Map<String, Handler>> exactHandlers = new HashMap<>();
@@ -40,24 +41,13 @@ public class Server extends Context {
 	private final List<Filter> filters = new ArrayList<>();
 
 	// HTTP Security Attributes
-	Map<Handler, String> securityAttributes = new HashMap<>();
+	private final Map<Handler, String> securityAttributes = new HashMap<>();
 
-	// Error Handler
-	private ErrorHandler errorHandler = (ctx, t) -> {
-		if (t instanceof WebException e) {
-			t = e.getCause();
-			ctx.setResponseStatus(e.getStatus());
-		} else {
-			ctx.setResponseStatus(StatusCode.INTERNAL_SERVER_ERROR);
-		}
-		if (t != null) {
-			Log.error(t, "Error encountered while handling: {} {}", ctx.method(), ctx.path());
-		}
-		return "ERROR: " + ctx.responseStatus();
-	};
+	// Global Error Handler
+	private ErrorHandler errorHandler = ErrorHandler.DEFAULT;
 
 	// HTTP Asset Handler
-	private final Handler ASSET_HANDLER;
+	private final Handler assetHandler;
 
 	private volatile ServerSocket serverSocket;
 	private volatile boolean started;
@@ -78,7 +68,8 @@ public class Server extends Context {
 		int processors = Runtime.getRuntime().availableProcessors();
 		AppConfig.get().load(Map.of(
 				"runtime.pid", ProcessHandle.current().pid(),
-				"runtime.processors", processors));
+				"runtime.processors", processors
+		));
 
 		// system properties have the highest priority
 		AppConfig.get().load(System.getProperties());
@@ -87,7 +78,7 @@ public class Server extends Context {
 		AppConfig.get().interpolate();
 
 		// init asset handler
-		ASSET_HANDLER = new AssetHandler();
+		assetHandler = new AssetHandler();
 	}
 
 	public Server start() throws Exception {
@@ -97,25 +88,31 @@ public class Server extends Context {
 		started = true;
 		int port = AppConfig.get().getInt("http.port");
 		int backlog = AppConfig.get().getInt("http.backlog");
+		int bufferSize = AppConfig.get().getInt("tcp.bufferSize");
 		InetAddress bindAddr = InetAddress.getByName(AppConfig.get().get("http.bindAddr"));
-		int timeout = AppConfig.get().getInt("session.timeout") * 60 * 1000;
-		serverSocket = new ServerSocket(port, backlog, bindAddr);
+		serverSocket = new ServerSocket();
 		serverSocket.setReuseAddress(true);
+		serverSocket.setReceiveBufferSize(bufferSize);
+		serverSocket.bind(new InetSocketAddress(bindAddr, port), backlog);
 		Thread main = new Thread(Unchecked.runnable(() -> {
+			AtomicLong counter = new AtomicLong();
 			while (started) {
 				Socket socket = serverSocket.accept();
 				executor.execute(() -> {
+					long id = counter.incrementAndGet();
 					try (socket) {
-						Log.debug("Connected: {}", socket);
+						Log.debug("Connection({}) Established: {}", id, socket);
 						socket.setTcpNoDelay(true);
-						socket.setSoTimeout(timeout);
+						socket.setSendBufferSize(bufferSize);
+						socket.setSoTimeout(HttpContext.SESSION_TIMEOUT);
 						handleConnection(socket);
+						Log.debug("Connection({}) Terminated.", id);
+					} catch (EOFException e) {
+						Log.debug("Connection({}) Terminated: Closed by remote peer.", id);
 					} catch (SocketTimeoutException e) {
-						Log.debug("Connection Timeout: {}", socket);
+						Log.debug("Connection({}) Terminated: Socket timed out.", id);
 					} catch (Exception e) {
-						Log.error(e, "Connection Error: {}", socket);
-					} finally {
-						Log.debug("Disconnected: {}", socket);
+						Log.error(e, "Connection({}) Terminated: Uncaught Exception:", id);
 					}
 				});
 			}
@@ -147,11 +144,13 @@ public class Server extends Context {
 	}
 
 	public Server onStart(CheckedConsumer<Server> handler) {
+		ensureNotStarted();
 		onStartHandlers.add(handler);
 		return this;
 	}
 
 	public Server onStop(CheckedConsumer<Server> handler) {
+		ensureNotStarted();
 		onStopHandlers.add(handler);
 		return this;
 	}
@@ -177,6 +176,7 @@ public class Server extends Context {
 	}
 
 	public Server handler(List<String> methods, String path, Handler handler, String securityAttribute) {
+		ensureNotStarted();
 		Map<String, Map<String, Handler>> handlers = exactHandlers;
 		if (path.endsWith("*")) {
 			path = path.substring(0, path.length() - 1);
@@ -190,6 +190,7 @@ public class Server extends Context {
 	}
 
 	public Server handler(Class<?>... classes) {
+		ensureNotStarted();
 		for (Class<?> clazz : classes) {
 			Path basePath = clazz.getAnnotation(Path.class);
 			String path = basePath == null ? "" : basePath.value();
@@ -217,11 +218,13 @@ public class Server extends Context {
 	}
 
 	public Server filter(Filter filter) {
+		ensureNotStarted();
 		filters.add(filter);
 		return this;
 	}
 
 	public Server filter(Class<? extends Filter>... classes) {
+		ensureNotStarted();
 		for (Class<? extends Filter> clazz : classes) {
 			filters.add(instance(clazz));
 		}
@@ -229,38 +232,39 @@ public class Server extends Context {
 	}
 
 	public Server error(ErrorHandler handler) {
+		ensureNotStarted();
 		this.errorHandler = handler;
 		return this;
 	}
 
 	public Server error(Class<? extends ErrorHandler> clazz) {
+		ensureNotStarted();
 		errorHandler = instance(clazz);
 		return this;
+	}
+
+	private void ensureNotStarted() {
+		if (started) {
+			throw new IllegalStateException("Server has already started.");
+		}
 	}
 
 	private void handleConnection(Socket socket) throws Exception {
 		InputStream in = new BufferedInputStream(socket.getInputStream());
 		OutputStream out = new BufferedOutputStream(socket.getOutputStream());
+		AtomicLong counter = new AtomicLong();
 		while (true) {
 			HttpContext ctx = null;
-			Object result = null;
 			Handler handler = null;
+			Object result = null;
 			Throwable th = null;
 			try {
 				// parse request
-				ctx = HttpContext.of(socket, in, out);
-				if (ctx == null) {
-					Log.debug("Closed by remote peer: {}", socket);
-					break;
-				}
+				ctx = new HttpContext(counter.incrementAndGet(), socket, out, HttpCodec.parseRequest(in));
+				Log.debug("#{}: {} {} {}", ctx.id(), ctx.method(), ctx.path(), socket);
 
-				// process request
-				Log.debug("#{}: {} {} {}", ctx.id(), ctx.method(), ctx.path(), socket.getRemoteSocketAddress());
-
-				// search for exact handler
-				handler = exactHandlers.getOrDefault(ctx.path(), Collections.emptyMap()).get(ctx.method());
-
-				// search for generic handler
+				// search for handler: exact handler > generic handler > asset handler
+				handler = exactHandlers.getOrDefault(ctx.path(), Map.of()).get(ctx.method());
 				if (handler == null) {
 					for (Map.Entry<String, Map<String, Handler>> entry : genericHandlers.entrySet()) {
 						if (ctx.path().startsWith(entry.getKey())) {
@@ -269,18 +273,14 @@ public class Server extends Context {
 						}
 					}
 				}
-
-				// set security attribute
 				if (handler != null) {
 					ctx.setSecurityAttribute(securityAttributes.get(handler));
 				}
-
-				// asset handler
 				if (handler == null) {
-					handler = ASSET_HANDLER;
+					handler = assetHandler;
 				}
 
-				// before
+				// apply before filters
 				for (Filter filter : filters) {
 					filter.before(ctx, handler);
 					if (ctx.isCommitted()) {
@@ -288,13 +288,13 @@ public class Server extends Context {
 					}
 				}
 
-				// handler
+				// handle request
 				if (!ctx.isCommitted()) {
 					result = handler.handle(ctx);
 
-					// after
-					for (int i = filters.size() - 1; i >= 0; i--) {
-						filters.get(i).after(ctx, handler, result);
+					// apply after filters
+					for (Filter filter : filters.reversed()) {
+						filter.after(ctx, handler, result);
 						if (ctx.isCommitted()) {
 							break;
 						}
@@ -305,7 +305,10 @@ public class Server extends Context {
 				if (e instanceof InvocationTargetException ex && ex.getCause() != null) {
 					th = ex.getCause();
 				}
-				if (ctx == null) { // failed to parse request
+				if (th instanceof EOFException eof) {
+					throw eof;
+				}
+				if (ctx == null) {
 					try {
 						HttpCodec.send(out, StatusCode.BAD_REQUEST);
 					} catch (Exception ex) {
@@ -321,24 +324,24 @@ public class Server extends Context {
 					if (!ctx.isCommitted()) {
 						ctx.commit(result);
 					}
+					Log.debug("#{}: {} {}", ctx.id(), ctx.responseStatus(), ctx.responseLength());
 
-					// complete
+					// apply complete filters
 					for (Filter filter : filters) {
 						try {
 							filter.complete(ctx, handler, th);
 						} catch (Exception e) {
-							Log.error(e, "Filter failed: {}", ctx.path());
+							Log.error(e, "Failed to apply filter: #{}: {} {} {}", ctx.id(), ctx.method(), ctx.path(), ctx.socket());
 						}
 					}
 
-					// clear pending request body
+					// discard pending request body
 					ctx.body().transferTo(OutputStream.nullOutputStream());
-					Log.debug("#{}: {} {}", ctx.id(), ctx.responseStatus(), ctx.responseLength());
 				}
 			}
 
-			// disconnect
-			if ("close".equalsIgnoreCase(ctx.headers().get(HeaderName.CONNECTION))) {
+			// close current connection
+			if (HeaderValue.CLOSE.equals(ctx.headers().get(HeaderName.CONNECTION))) {
 				break;
 			}
 		}

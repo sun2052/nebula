@@ -7,14 +7,52 @@ import java.util.Base64;
 /**
  * Hash Utility
  */
-public interface Hash {
-	String HASH_ALGORITHM = "SHA-512";
+public final class Hash {
+	public static final Hash MD5 = new Hash("MD5");
+	public static final Hash SHA1 = new Hash("SHA-1");
+	public static final Hash SHA256 = new Hash("SHA-256");
+	public static final Hash SHA512 = new Hash("SHA-512");
 
-	static String hash(String... strings) throws NoSuchAlgorithmException {
-		MessageDigest digest = MessageDigest.getInstance(HASH_ALGORITHM);
-		for (String string : strings) {
-			digest.update(string.getBytes());
+	private static final Base64.Encoder BASE64_ENCODER = Base64.getUrlEncoder().withoutPadding();
+	private final String algorithm;
+
+	private Hash(String algorithm) {
+		this.algorithm = algorithm;
+	}
+
+	public byte[] toBytes(byte[]... dataList) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance(algorithm);
+			for (byte[] data : dataList) {
+				digest.update(data);
+			}
+			return digest.digest();
+		} catch (NoSuchAlgorithmException e) {
+			throw new RuntimeException(e);
 		}
-		return Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest());
+	}
+
+	public byte[] toBytes(String... dataList) {
+		byte[][] bytes = new byte[dataList.length][];
+		for (int i = 0; i < dataList.length; i++) {
+			bytes[i] = dataList[i].getBytes();
+		}
+		return toBytes(bytes);
+	}
+
+	public String toHex(byte[]... dataList) {
+		return Hex.encode(toBytes(dataList));
+	}
+
+	public String toHex(String... dataList) {
+		return Hex.encode(toBytes(dataList));
+	}
+
+	public String toBase64(byte[]... dataList) {
+		return BASE64_ENCODER.encodeToString(toBytes(dataList));
+	}
+
+	public String toBase64(String... dataList) {
+		return BASE64_ENCODER.encodeToString(toBytes(dataList));
 	}
 }

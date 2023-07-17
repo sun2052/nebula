@@ -34,6 +34,8 @@ public class ContentType {
 		TYPES.put("jpg", "image/jpeg");
 		TYPES.put("jpeg", "image/jpeg");
 		TYPES.put("png", "image/png");
+		TYPES.put("webp", "image/webp");
+		TYPES.put("avif", "image/avif");
 		TYPES.put("svg", "image/svg+xml");
 		TYPES.put("ico", "image/x-icon");
 
@@ -47,11 +49,15 @@ public class ContentType {
 	}
 
 	public static String byName(String name) {
+		String ext = null;
 		int index = name.lastIndexOf('.');
 		if (index != -1) {
-			String ext = name.substring(index + 1);
-			return TYPES.get(ext);
+			ext = name.substring(index + 1);
 		}
-		return BINARY;
+		return byExtension(ext);
+	}
+
+	public static String byExtension(String ext) {
+		return TYPES.getOrDefault(ext, BINARY);
 	}
 }

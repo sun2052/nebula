@@ -21,7 +21,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class Node implements Closeable {
 	private static volatile int connectTimeoutMillis = 5000; // socket connect timeout in millis
 	private static volatile int reconnectDelayMillis = 5000; // reconnect delay in millis
-	private static volatile int bufferSize = 1024 * 1024 * 16; // send and receive buffer size in bytes
+	private static volatile int bufferSize = 1024 * 1024 * 16; // max send/receive buffer size in bytes
 	private static volatile int keepAliveIdleTime = 45; // max idle time in seconds before sending the probe
 	private static volatile int keepAliveProbeInterval = 5; // wait interval in seconds before sending another probe
 	private static volatile int keepAliveProbeCount = 3; // max probes count to be sent

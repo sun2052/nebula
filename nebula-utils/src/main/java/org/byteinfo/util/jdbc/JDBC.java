@@ -31,7 +31,7 @@ public interface JDBC {
 	 * @throws SQLException if the query fails
 	 */
 	static <T> List<T> query(Connection connection, Class<T> type, String sql, Object... args) throws SQLException {
-		return query(connection, RowMapper.REFLECTIVE(type), sql, args);
+		return query(connection, RowMapper.reflective(type), sql, args);
 	}
 
 	/**

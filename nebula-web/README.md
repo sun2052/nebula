@@ -10,7 +10,7 @@ Features
 * Lightweight: **40 KB**
 * Concise API: **MVC API** and **Script API**
 * Simple Design: **thread-per-request style** using **Virtual Threads**
-* HTTP Server: **HTTP/1.1** with **ETag**
+* HTTP Server: **[HTTP/1.1](https://www.rfc-editor.org/rfc/rfc9112)**, **Chunked Transfer**, **Multipart Request**, **ETag**
 
 
 Documentation

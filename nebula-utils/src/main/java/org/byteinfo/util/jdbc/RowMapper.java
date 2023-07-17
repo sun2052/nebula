@@ -3,7 +3,10 @@ package org.byteinfo.util.jdbc;
 import org.byteinfo.util.function.Unchecked;
 import org.byteinfo.util.reflect.Reflect;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Type;
+import java.sql.Blob;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -38,7 +41,7 @@ public interface RowMapper<T> {
 	 * @param clazz target type
 	 * @return reflective RowMapper
 	 */
-	static <T> RowMapper<T> REFLECTIVE(Class<T> clazz) {
+	static <T> RowMapper<T> reflective(Class<T> clazz) {
 		return (rs, rowNum) -> {
 			try {
 				ResultSetMetaData meta = rs.getMetaData();
@@ -51,13 +54,13 @@ public interface RowMapper<T> {
 					}
 					return Reflect.create(clazz, Unchecked.biFunction((name, type) -> getObject(type, rs, map.get(name))));
 				}
-			} catch (ReflectiveOperationException e) {
+			} catch (Exception e) {
 				throw new SQLException(e);
 			}
 		};
 	}
 
-	private static Object getObject(Type type, ResultSet rs, int index) throws SQLException {
+	private static Object getObject(Type type, ResultSet rs, int index) throws SQLException, IOException {
 		if (type == String.class) {
 			return rs.getString(index);
 		} else if (type == Integer.class) {
@@ -75,7 +78,13 @@ public interface RowMapper<T> {
 		} else if (type == LocalDateTime.class) {
 			Timestamp timestamp = rs.getTimestamp(index);
 			return timestamp == null ? null : timestamp.toLocalDateTime();
+		} else if (type == InputStream.class) {
+			Blob blob = rs.getBlob(index);
+			return blob == null ? null : blob.getBinaryStream();
+		} else if (type == byte[].class) {
+			Blob blob = rs.getBlob(index);
+			return blob == null ? null : blob.getBinaryStream().readAllBytes();
 		}
-		throw new UnsupportedOperationException("unsupported type: " + type + ", supported: String, Integer, Long, Boolean, LocalDate, LocalTime, LocalDateTime");
+		throw new UnsupportedOperationException("Unsupported type: " + type + ", Supported: String, Integer, Long, Boolean, LocalDate, LocalTime, LocalDateTime, InputStream, byte[]");
 	}
 }

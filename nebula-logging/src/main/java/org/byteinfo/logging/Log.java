@@ -52,38 +52,34 @@ public final class Log {
 			int backups = 0;
 			if (parts.length == 2) {
 				for (String optionStr : parts[1].split(",")) {
-					String[] option = optionStr.split("=");
+					String[] option = optionStr.split("=", 2);
 					if (option.length != 2) {
 						throw new LogException("invalid config option: " + optionStr + ", expected: level=info[,rolling=daily[,backups=60]]");
 					}
 					switch (option[0]) {
-						case "level":
+						case "level" -> {
 							var levelOption = Arrays.stream(Level.values()).filter(value -> value.name().equalsIgnoreCase(option[1])).findFirst();
 							if (levelOption.isPresent()) {
 								level = levelOption.get();
 							} else {
 								throw new LogException("invalid level option: " + optionStr + ", expected: [trace, debug, info, warn, error, off]");
 							}
-							break;
-
-						case "rolling":
+						}
+						case "rolling" -> {
 							try {
 								rolling = (Rolling) Rolling.class.getDeclaredField(option[1].toUpperCase()).get(null);
 							} catch (Exception e) {
 								throw new LogException("invalid rolling option: " + optionStr + ", expected: [none, daily, monthly]");
 							}
-							break;
-
-						case "backups":
+						}
+						case "backups" -> {
 							try {
 								backups = Integer.parseInt(option[1]);
 							} catch (Exception e) {
 								throw new LogException("invalid backups option: " + optionStr + ", expected: >= 0");
 							}
-							break;
-
-						default:
-							throw new LogException("unknown config option: " + optionStr + ", expected: level=info[,rolling=daily[,backups=60]]");
+						}
+						default -> throw new LogException("unknown config option: " + optionStr + ", expected: level=info[,rolling=daily[,backups=60]]");
 					}
 				}
 			}
