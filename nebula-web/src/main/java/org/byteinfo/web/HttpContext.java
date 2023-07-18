@@ -46,8 +46,8 @@ public class HttpContext {
 	// response
 	private int responseStatus = StatusCode.OK;
 	private String responseType = ContentType.HTML;
-	private Headers responseHeaders = new Headers();
-	private Map<String, Cookie> responseCookies = new LinkedHashMap<>();
+	private final Headers responseHeaders = new Headers();
+	private final Map<String, Cookie> responseCookies = new LinkedHashMap<>();
 	private long responseLength = -1;
 	private boolean committed;
 
@@ -96,7 +96,7 @@ public class HttpContext {
 
 	public Map<String, Cookie> cookies() {
 		if (cookies == null) {
-			cookies = HttpCodec.parseCookies(request.headers());
+			cookies = HttpCodec.parseCookies(headers());
 		}
 		return cookies;
 	}
@@ -155,7 +155,7 @@ public class HttpContext {
 		}
 	}
 
-	public boolean paramAsBoolean(String name) throws IOException {
+	public boolean paramAsBoolean(String name) {
 		try {
 			return Boolean.parseBoolean(param(name));
 		} catch (Exception e) {
@@ -163,7 +163,7 @@ public class HttpContext {
 		}
 	}
 
-	public boolean paramAsBoolean(String name, boolean defaultValue) throws IOException {
+	public boolean paramAsBoolean(String name, boolean defaultValue) {
 		try {
 			return Boolean.parseBoolean(param(name));
 		} catch (Exception e) {
@@ -266,7 +266,7 @@ public class HttpContext {
 				session.timeout = WheelTimer.getDefault().newTimeout(t -> session.destroy(), SESSION_TIMEOUT);
 				return session;
 			} else {
-				removeCookie(SESSION_COOKIE_NAME);
+				removeResponseCookie(SESSION_COOKIE_NAME);
 			}
 		}
 
@@ -278,7 +278,7 @@ public class HttpContext {
 				if (previous == null) {
 					session.timeout = WheelTimer.getDefault().newTimeout(t -> session.destroy(), SESSION_TIMEOUT);
 					Cookie c = new Cookie(SESSION_COOKIE_NAME, id);
-					c.setDomain(host());
+					c.setDomain(domain());
 					c.setHttpOnly(true);
 					responseCookies.put(SESSION_COOKIE_NAME, c);
 					return session;
@@ -298,22 +298,19 @@ public class HttpContext {
 	}
 
 	public boolean xhr() {
-		return HeaderValue.XML_HTTP_REQUEST.equals(request.headers().get(HeaderName.REQUESTED_WITH));
+		return HeaderValue.XML_HTTP_REQUEST.equals(headers().get(HeaderName.REQUESTED_WITH));
 	}
 
 	public String host() {
-		String host = request.headers().get(HeaderName.FORWARDED_HOST);
+		String host = headers().get(HeaderName.FORWARDED_HOST);
 		if (host == null) {
-			host = request.headers().get(HeaderName.HOST);
+			host = headers().get(HeaderName.HOST);
 		}
-		if (host != null) {
-			return host.split(":", 2)[0];
-		}
-		return null;
+		return host;
 	}
 
 	public int port() {
-		String port = request.headers().get(HeaderName.FORWARDED_PORT);
+		String port = headers().get(HeaderName.FORWARDED_PORT);
 		if (port != null) {
 			return Integer.parseInt(port);
 		} else {
@@ -321,9 +318,13 @@ public class HttpContext {
 		}
 	}
 
+	public String domain() {
+		return host().split(":", 2)[0];
+	}
+
 	public String remoteAddress() {
 		// X-Forwarded-For: <client>, <proxy1>, <proxy2>
-		String address = request.headers().get(HeaderName.FORWARDED_FOR);
+		String address = headers().get(HeaderName.FORWARDED_FOR);
 		if (address != null) {
 			return address.split(",", 2)[0];
 		} else {
@@ -364,21 +365,11 @@ public class HttpContext {
 		return responseHeaders;
 	}
 
-	public HttpContext setResponseHeaders(Headers responseHeaders) {
-		this.responseHeaders = responseHeaders;
-		return this;
-	}
-
 	public Map<String, Cookie> responseCookies() {
 		return responseCookies;
 	}
 
-	public HttpContext setResponseCookies(Map<String, Cookie> responseCookies) {
-		this.responseCookies = responseCookies;
-		return this;
-	}
-
-	public HttpContext removeCookie(String name) {
+	public HttpContext removeResponseCookie(String name) {
 		Cookie cookie = new Cookie(name, "");
 		cookie.setMaxAge(0);
 		responseCookies.put(name, cookie);

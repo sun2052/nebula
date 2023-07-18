@@ -7,7 +7,7 @@ Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementa
 Features
 --------
 
-* Lightweight: **20 KB**
+* Lightweight: **19 KB**
 * Concise API
 * Dynamic Configuration
 * Console and File output with Rolling support
@@ -20,11 +20,13 @@ Documentation
 
 ### Syntax
 ```
-[output[:options]]
-[output[;options]]
+[output][:option1][:option2][:optionN]
+[output][;option1][;option2][;optionN]
 
 output: stdout, stderr, /path/to/file.{}.log
-options: level=info[,rolling=daily[,backups=60]]
+option: name=value
+
+options:
 level = trace, debug, info, warn, error, off
 rolling = none, daily, monthly
 backups = max number of old log files to keep
@@ -39,10 +41,10 @@ backups = 30, file output only
 ### Apply Config
 ```
 # Java API
-Log.applyConfig("-Dnlog=/path/to/file.{}.log:rolling=daily,backups=60");
+Log.applyConfig("-Dnlog=/path/to/file.{}.log:rolling=daily:backups=30");
 
 # system properties
-java -Dnlog=/path/to/file.{}.log:rolling=daily,backups=60 -jar app.jar
+java -Dnlog=/path/to/file.{}.log:rolling=daily:backups=30 -jar app.jar
 ```
 
 ### Usage

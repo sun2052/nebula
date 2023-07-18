@@ -7,7 +7,7 @@ Lightweight Dynamic Proxy Generator using [JEP draft: Class-File API (Preview)](
 Features
 --------
 
-* Lightweight: **15 KB**
+* Lightweight: **16 KB**
 * Concise API: `Proxy.of(Target.class).with(aspects).instance()`
 * Simple Design: **Runtime Subclass Generation**
 

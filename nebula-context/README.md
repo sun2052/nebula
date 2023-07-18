@@ -7,7 +7,7 @@ Lightweight Dependency Injection ([JSR 330](https://www.jcp.org/en/jsr/detail?id
 Features
 --------
 
-* Lightweight: **15 KB**
+* Lightweight: **13 KB**
 * Concise API
 * Simple Design
 

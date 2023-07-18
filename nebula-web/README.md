@@ -7,7 +7,7 @@ Lightweight Web MVC Framework and HTTP Server built with [JEP 444: Virtual Threa
 Features
 --------
 
-* Lightweight: **40 KB**
+* Lightweight: **46 KB**
 * Concise API: **MVC API** and **Script API**
 * Simple Design: **thread-per-request style** using **Virtual Threads**
 * HTTP Server: **[HTTP/1.1](https://www.rfc-editor.org/rfc/rfc9112)**, **Chunked Transfer**, **Multipart Request**, **ETag**

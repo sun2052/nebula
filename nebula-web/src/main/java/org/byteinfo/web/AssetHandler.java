@@ -24,7 +24,7 @@ public class AssetHandler implements Handler {
 	@Override
 	public Object handle(HttpContext context) throws IOException {
 		String path = context.path();
-		String type = ContentType.byName(path);
+		String type = ContentType.byFileName(path);
 
 		if (pathRoot != null) {
 			Path file = pathRoot.resolve(path.substring(1)).normalize();

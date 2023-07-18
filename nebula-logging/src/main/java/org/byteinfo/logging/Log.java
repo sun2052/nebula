@@ -2,11 +2,12 @@ package org.byteinfo.logging;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Supplier;
 
 public final class Log {
-	private static volatile Level level = Level.INFO;
+	private static volatile Level level;
 	private static volatile Writer writer;
 
 	static {
@@ -20,11 +21,13 @@ public final class Log {
 	 * Parses and apply the specified config string.
 	 *
 	 * <pre>
-	 * [output[:options]]
-	 * [output[;options]]
+	 * [output][:option1][:option2][:optionN]
+	 * [output][;option1][;option2][;optionN]
 	 *
 	 * output: stdout, stderr, /path/to/file.{}.log
-	 * options: level=info[,rolling=daily[,backups=60]]
+	 * option: name=value
+	 *
+	 * options:
 	 * level = trace, debug, info, warn, error, off
 	 * rolling = none, daily, monthly
 	 * backups = max number of old log files to keep
@@ -39,58 +42,60 @@ public final class Log {
 	 * @param config the config string
 	 */
 	public static void applyConfig(String config) {
-		if (config == null) {
+		if (config == null || config.isEmpty()) {
 			level = Level.INFO;
 			writer = new ConsoleWriter(System.out);
 		} else {
-			String[] parts = config.split("[:;]");
-			if (parts.length > 2) {
-				throw new LogException("invalid config: " + config + ", expected: output[:options]]");
-			}
-
-			Rolling rolling = Rolling.NONE;
-			int backups = 0;
-			if (parts.length == 2) {
-				for (String optionStr : parts[1].split(",")) {
-					String[] option = optionStr.split("=", 2);
-					if (option.length != 2) {
-						throw new LogException("invalid config option: " + optionStr + ", expected: level=info[,rolling=daily[,backups=60]]");
-					}
-					switch (option[0]) {
-						case "level" -> {
-							var levelOption = Arrays.stream(Level.values()).filter(value -> value.name().equalsIgnoreCase(option[1])).findFirst();
-							if (levelOption.isPresent()) {
-								level = levelOption.get();
-							} else {
-								throw new LogException("invalid level option: " + optionStr + ", expected: [trace, debug, info, warn, error, off]");
-							}
-						}
-						case "rolling" -> {
-							try {
-								rolling = (Rolling) Rolling.class.getDeclaredField(option[1].toUpperCase()).get(null);
-							} catch (Exception e) {
-								throw new LogException("invalid rolling option: " + optionStr + ", expected: [none, daily, monthly]");
-							}
-						}
-						case "backups" -> {
-							try {
-								backups = Integer.parseInt(option[1]);
-							} catch (Exception e) {
-								throw new LogException("invalid backups option: " + optionStr + ", expected: >= 0");
-							}
-						}
-						default -> throw new LogException("unknown config option: " + optionStr + ", expected: level=info[,rolling=daily[,backups=60]]");
-					}
+			String output = "stdout";
+			Map<String, String> options = new HashMap<>();
+			for (String optionStr : config.split("[:;]")) {
+				if (optionStr.isEmpty()) {
+					continue;
+				}
+				String[] option = optionStr.split("=", 2);
+				if (option.length == 1) {
+					output = option[0];
+				} else {
+					options.put(option[0], option[1]);
 				}
 			}
 
-			switch (parts[0]) {
+			Rolling rolling = Rolling.NONE;
+			int backups = 30;
+			for (Map.Entry<String, String> option : options.entrySet()) {
+				switch (option.getKey()) {
+					case "level" -> {
+						try {
+							level = Level.valueOf(option.getValue().toUpperCase());
+						} catch (Exception e) {
+							throw new LogException("invalid level option: " + option.getValue() + ", expected: [trace, debug, info, warn, error, off]");
+						}
+					}
+					case "rolling" -> {
+						try {
+							rolling = (Rolling) Rolling.class.getDeclaredField(option.getValue().toUpperCase()).get(null);
+						} catch (Exception e) {
+							throw new LogException("invalid rolling option: " + option.getValue() + ", expected: [none, daily, monthly]");
+						}
+					}
+					case "backups" -> {
+						try {
+							backups = Integer.parseInt(option.getValue());
+						} catch (Exception e) {
+							throw new LogException("invalid backups option: " + option.getValue() + ", expected: >= 0");
+						}
+					}
+					default -> throw new LogException("unknown config option: " + option.getKey() + ", expected: [level, rolling, backups]");
+				}
+			}
+
+			switch (output) {
 				case "stdout" -> writer = new ConsoleWriter(System.out);
 				case "stderr" -> writer = new ConsoleWriter(System.err);
 				default -> {
-					Path path = Path.of(parts[0]);
+					Path path = Path.of(output);
 					if (Files.notExists(path.getParent())) {
-						throw new LogException("invalid output config: " + parts[0] + ", parent path does not exist");
+						throw new LogException("invalid output config: " + output + ", parent path does not exist");
 					}
 					writer = new FileWriter(path, rolling, backups);
 				}

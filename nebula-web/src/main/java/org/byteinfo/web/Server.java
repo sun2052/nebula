@@ -101,18 +101,18 @@ public class Server extends Context {
 				executor.execute(() -> {
 					long id = counter.incrementAndGet();
 					try (socket) {
-						Log.debug("Connection({}) Established: {}", id, socket);
+						Log.debug("Connection(#{}) Established: {}", id, socket);
 						socket.setTcpNoDelay(true);
 						socket.setSendBufferSize(bufferSize);
 						socket.setSoTimeout(HttpContext.SESSION_TIMEOUT);
 						handleConnection(socket);
-						Log.debug("Connection({}) Terminated.", id);
+						Log.debug("Connection(#{}) Terminated.", id);
 					} catch (EOFException e) {
-						Log.debug("Connection({}) Terminated: Closed by remote peer.", id);
+						Log.debug("Connection(#{}) Terminated: Closed by remote peer.", id);
 					} catch (SocketTimeoutException e) {
-						Log.debug("Connection({}) Terminated: Socket timed out.", id);
+						Log.debug("Connection(#{}) Terminated: Socket timed out.", id);
 					} catch (Exception e) {
-						Log.error(e, "Connection({}) Terminated: Uncaught Exception:", id);
+						Log.error(e, "Connection(#{}) Terminated: Uncaught Exception:", id);
 					}
 				});
 			}

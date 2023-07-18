@@ -7,7 +7,7 @@ Lightweight Common Utilities
 Features
 --------
 
-* Lightweight: **45 KB**
+* Lightweight: **49 KB**
 * Concise API
 * Practical: **JDBC**, **WheelTimer**, **Exception Handling**, etc.
 

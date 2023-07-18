@@ -7,7 +7,7 @@ Lightweight Distributed Network Communication Framework
 Features
 --------
 
-* Lightweight: **11 KB**
+* Lightweight: **9 KB**
 * Concise API
 * Modular Design
 

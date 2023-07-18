@@ -7,9 +7,10 @@ import java.util.Map;
 public class ContentType {
 	public static final String HTML = "text/html; charset=utf-8";
 	public static final String CSS = "text/css; charset=utf-8";
-	public static final String JS = "application/javascript; charset=utf-8";
-	public static final String JSON = "application/json; charset=utf-8";
+	public static final String JS = "text/javascript; charset=utf-8";
 	public static final String TEXT = "text/plain; charset=utf-8";
+	public static final String JSON = "application/json";
+	public static final String XML = "application/xml";
 	public static final String BINARY = "application/octet-stream";
 	public static final String FORM = "application/x-www-form-urlencoded";
 	public static final String MULTIPART = "multipart/form-data";
@@ -18,15 +19,15 @@ public class ContentType {
 
 	static {
 		// Web Contents
-		TYPES.put("html", "text/html");
-		TYPES.put("css", "text/css");
-		TYPES.put("js", "application/javascript");
+		TYPES.put("html", HTML);
+		TYPES.put("css", CSS);
+		TYPES.put("js", JS);
 
 		// Data Interchange
-		TYPES.put("txt", "text/plain");
-		TYPES.put("json", "application/json");
-		TYPES.put("xml", "application/xml");
-		TYPES.put("bin", "application/octet-stream");
+		TYPES.put("txt", TEXT);
+		TYPES.put("json", JSON);
+		TYPES.put("xml", XML);
+		TYPES.put("bin", BINARY);
 
 		// Media Files
 		TYPES.put("bmp", "image/bmp");
@@ -48,16 +49,16 @@ public class ContentType {
 		TYPES.put("woff2", "font/woff2");
 	}
 
-	public static String byName(String name) {
-		String ext = null;
-		int index = name.lastIndexOf('.');
+	public static String byFileName(String fileName) {
+		String extension = null;
+		int index = fileName.lastIndexOf('.');
 		if (index != -1) {
-			ext = name.substring(index + 1);
+			extension = fileName.substring(index + 1);
 		}
-		return byExtension(ext);
+		return byExtension(extension);
 	}
 
-	public static String byExtension(String ext) {
-		return TYPES.getOrDefault(ext, BINARY);
+	public static String byExtension(String extension) {
+		return TYPES.getOrDefault(extension, BINARY);
 	}
 }
