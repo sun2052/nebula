@@ -6,6 +6,7 @@ public interface HeaderName {
 	String CONTENT_LENGTH = "content-length";
 	String CONTENT_DISPOSITION = "content-disposition";
 	String TRANSFER_ENCODING = "transfer-encoding";
+	String USER_AGENT = "user-agent";
 	String CONNECTION = "connection";
 	String LOCATION = "location";
 	String COOKIE = "cookie";

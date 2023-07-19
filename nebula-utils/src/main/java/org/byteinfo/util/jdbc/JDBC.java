@@ -14,12 +14,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
- * JDBC
+ * JDBC Util
  */
 public interface JDBC {
+
+	/* ---------------- Universal Methods -------------- */
+
 	/**
 	 * Query given SQL to create a prepared statement from SQL and a list of arguments to bind to the query, mapping each row to a Java object via a Reflective RowMapper.
 	 *
@@ -99,7 +101,7 @@ public interface JDBC {
 			for (Object arg : args) {
 				ps.setObject(index++, arg);
 			}
-			ps.execute();
+			ps.executeUpdate();
 			ResultSet rs = ps.getGeneratedKeys();
 			return rs.next() ? rs.getLong(1) : -1;
 		}
@@ -163,31 +165,48 @@ public interface JDBC {
 		}
 	}
 
-	static <T> List<T> queryByParam(Connection connection, T query) throws SQLException {
-		return queryByParam(connection, query, null);
+
+	/* ---------------- Convenience Methods -------------- */
+
+	static <T> List<T> selectList(Connection connection, T query) throws SQLException {
+		return selectList(connection, query, null, -1, -1);
 	}
 
-	static <T> List<T> queryByParam(Connection connection, T query, String appendix) throws SQLException {
+	static <T> List<T> selectList(Connection connection, T query, int limit, int offset) throws SQLException {
+		return selectList(connection, query, null, limit, offset);
+	}
+
+	static <T> List<T> selectList(Connection connection, T query, String appendix, int limit, int offset) throws SQLException {
 		Map<String, Object> params = getAllParams(query);
 		StringBuilder sql = new StringBuilder(256);
 		sql.append("select * from `" + query.getClass().getSimpleName() + "` where 1 = 1");
-		for (String param : params.keySet()) {
-			sql.append(" and `" + param + "` = ?");
+		List<Object> args = new ArrayList<>();
+		for (Map.Entry<String, Object> entry : params.entrySet()) {
+			sql.append(" and `" + entry.getKey() + "` = ?");
+			args.add(entry.getValue());
 		}
 		if (appendix != null) {
 			sql.append(" ").append(appendix);
 		}
-		return (List<T>) query(connection, query.getClass(), sql.toString(), params.values().toArray());
+		if (limit > 0) {
+			sql.append(" limit ").append(limit);
+		}
+		if (offset > 0) {
+			sql.append(" offset ").append(offset);
+		}
+		return (List<T>) query(connection, query.getClass(), sql.toString(), args.toArray());
 	}
 
-	static <T> int countByParam(Connection connection, T query) throws SQLException {
+	static <T> int selectCount(Connection connection, T query) throws SQLException {
 		Map<String, Object> params = getAllParams(query);
 		StringBuilder sql = new StringBuilder(256);
 		sql.append("select count(*) from `" + query.getClass().getSimpleName() + "` where 1 = 1");
-		for (String param : params.keySet()) {
-			sql.append(" and `" + param + "` = ?");
+		List<Object> args = new ArrayList<>();
+		for (Map.Entry<String, Object> entry : params.entrySet()) {
+			sql.append(" and `" + entry.getKey() + "` = ?");
+			args.add(entry.getValue());
 		}
-		return count(connection, sql.toString(), params.values().toArray());
+		return count(connection, sql.toString(), args.toArray());
 	}
 
 	static <T> long insertData(Connection connection, T data) throws SQLException {
@@ -195,70 +214,74 @@ public interface JDBC {
 		if (params.isEmpty()) {
 			return -1;
 		}
+		List<String> columns = new ArrayList<>();
+		List<String> placeholders = new ArrayList<>();
+		List<Object> args = new ArrayList<>();
+		for (Map.Entry<String, Object> entry : params.entrySet()) {
+			columns.add("`" + entry.getKey() + "`");
+			placeholders.add("?");
+			args.add(entry.getValue());
+		}
 		StringBuilder sql = new StringBuilder(256);
 		sql.append("insert into `" + data.getClass().getSimpleName() + "` (");
-		sql.append(params.keySet().stream().map(k -> "`" + k + "`").collect(Collectors.joining(", ")));
+		sql.append(String.join(", ", columns));
 		sql.append(") values (");
-		List<String> list = new ArrayList<>(params.size());
-		for (int i = 0; i < params.size(); i++) {
-			list.add("?");
-		}
-		sql.append(String.join(", ", list));
+		sql.append(String.join(", ", placeholders));
 		sql.append(")");
-		return insert(connection, sql.toString(), params.values().toArray());
+		return insert(connection, sql.toString(), args.toArray());
 	}
 
 	static <T> int updateData(Connection connection, T data) throws SQLException {
+		return updateData(connection, data, null);
+	}
+
+	static <T> int updateData(Connection connection, T data, T query) throws SQLException {
 		Map<String, Object> params = getAllParams(data);
 		Object id = params.remove("id");
 		if (params.isEmpty()) {
 			return -1;
 		}
+		List<String> columns = new ArrayList<>();
+		List<Object> args = new ArrayList<>();
+		for (Map.Entry<String, Object> entry : params.entrySet()) {
+			columns.add("`" + entry.getKey() + "` = ?");
+			args.add(entry.getValue());
+		}
 		StringBuilder sql = new StringBuilder(256);
 		sql.append("update `" + data.getClass().getSimpleName() + "` set ");
-		List<String> list = new ArrayList<>(params.size());
-		for (String param : params.keySet()) {
-			list.add("`" + param + "` = ?");
+		sql.append(String.join(", ", columns));
+		if (query != null) {
+			Map<String, Object> conditions = getAllParams(query);
+			if (conditions.isEmpty()) {
+				query = null;
+			} else {
+				sql.append(" where 1 = 1");
+				for (Map.Entry<String, Object> entry : conditions.entrySet()) {
+					sql.append(" and `" + entry.getKey() + "` = ?");
+					args.add(entry.getValue());
+				}
+			}
 		}
-		sql.append(String.join(", ", list));
-		sql.append(" where `id` = ?");
-		List<Object> args = new ArrayList<>(params.values());
-		args.add(id);
+		if (query == null) {
+			sql.append(" where `id` = ?");
+			args.add(id);
+		}
 		return update(connection, sql.toString(), args.toArray());
 	}
 
-	static <T> int updateData(Connection connection, T data, T query) throws SQLException {
-		Map<String, Object> values = getAllParams(data);
-		values.remove("id");
-		if (values.isEmpty()) {
-			return -1;
-		}
-		StringBuilder sql = new StringBuilder(256);
-		sql.append("update `" + data.getClass().getSimpleName() + "` set ");
-		List<String> list = new ArrayList<>(values.size());
-		for (String param : values.keySet()) {
-			list.add("`" + param + "` = ?");
-		}
-		sql.append(String.join(", ", list));
-		sql.append(" where 1 = 1");
-		Map<String, Object> params = getAllParams(query);
-		for (String param : params.keySet()) {
-			sql.append(" and `" + param + "` = ?");
-		}
-		return update(connection, sql.toString(), params.values().toArray());
-	}
-
-	static <T> int delete(Connection connection, T query) throws SQLException {
+	static <T> int deleteData(Connection connection, T query) throws SQLException {
 		Map<String, Object> params = getAllParams(query);
 		if (params.isEmpty()) {
 			return -1;
 		}
 		StringBuilder sql = new StringBuilder(256);
 		sql.append("delete from `" + query.getClass().getSimpleName() + "` where 1 = 1");
-		for (String param : params.keySet()) {
-			sql.append(" and `" + param + "` = ?");
+		List<Object> args = new ArrayList<>();
+		for (Map.Entry<String, Object> entry : params.entrySet()) {
+			sql.append(" and `" + entry.getKey() + "` = ?");
+			args.add(entry.getValue());
 		}
-		return update(connection, sql.toString(), params.values().toArray());
+		return update(connection, sql.toString(), args.toArray());
 	}
 
 	private static Map<String, Object> getAllParams(Object query) throws SQLException {
