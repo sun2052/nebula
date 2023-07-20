@@ -70,28 +70,24 @@ public class Cookie {
 		this.httpOnly = httpOnly;
 	}
 
+	@Override
 	public String toString() {
-		StringBuilder buf = new StringBuilder().append(name).append('=').append(value);
+		StringBuilder buf = new StringBuilder(128).append(name).append('=').append(value);
 		if (domain != null) {
 			buf.append("; domain=").append(domain);
 		}
-
 		if (path != null) {
 			buf.append("; path=").append(path);
 		}
-
 		if (maxAge != null) {
 			buf.append("; max-age=").append(maxAge);
 		}
-
 		if (secure) {
 			buf.append("; secure");
 		}
-
 		if (httpOnly) {
 			buf.append("; httponly");
 		}
-
 		return buf.toString();
 	}
 }

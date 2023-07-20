@@ -101,18 +101,18 @@ public class Server extends Context {
 				executor.execute(() -> {
 					long id = counter.incrementAndGet();
 					try (socket) {
-						Log.debug("Connection(#{}) Established: {}", id, socket);
+						Log.debug("Connection {} Established: {}", id, socket);
 						socket.setTcpNoDelay(true);
 						socket.setSendBufferSize(bufferSize);
 						socket.setSoTimeout(HttpContext.SESSION_TIMEOUT);
-						handleConnection(socket);
-						Log.debug("Connection(#{}) Terminated.", id);
+						handleConnection(socket, id);
+						Log.debug("Connection {} Terminated.", id);
 					} catch (EOFException e) {
-						Log.debug("Connection(#{}) Terminated: Closed by remote peer.", id);
+						Log.debug("Connection {} Terminated: Closed by remote peer.", id);
 					} catch (SocketTimeoutException e) {
-						Log.debug("Connection(#{}) Terminated: Socket timed out.", id);
+						Log.debug("Connection {} Terminated: Socket timed out.", id);
 					} catch (Exception e) {
-						Log.error(e, "Connection(#{}) Terminated: Uncaught Exception:", id);
+						Log.error(e, "Connection {} Terminated: Uncaught Exception:", id);
 					}
 				});
 			}
@@ -249,7 +249,7 @@ public class Server extends Context {
 		}
 	}
 
-	private void handleConnection(Socket socket) throws Exception {
+	private void handleConnection(Socket socket, long connectionId) throws Exception {
 		InputStream in = new BufferedInputStream(socket.getInputStream());
 		OutputStream out = new BufferedOutputStream(socket.getOutputStream());
 		AtomicLong counter = new AtomicLong();
@@ -260,8 +260,8 @@ public class Server extends Context {
 			Throwable th = null;
 			try {
 				// parse request
-				ctx = new HttpContext(counter.incrementAndGet(), socket, out, HttpCodec.parseRequest(in));
-				Log.debug("#{}: {} {} {}", ctx.id(), ctx.method(), ctx.path(), socket);
+				ctx = new HttpContext(connectionId + "#" + counter.incrementAndGet(), socket, out, HttpCodec.parseRequest(in));
+				Log.debug("{}: {} {}", ctx.id(), ctx.method(), ctx.path());
 
 				// search for handler: exact handler > generic handler > asset handler
 				handler = exactHandlers.getOrDefault(ctx.path(), Map.of()).get(ctx.method());
@@ -324,19 +324,21 @@ public class Server extends Context {
 					if (!ctx.isCommitted()) {
 						ctx.commit(result);
 					}
-					Log.debug("#{}: {} {}", ctx.id(), ctx.responseStatus(), ctx.responseLength());
+					Log.debug("{}: {} {}", ctx.id(), ctx.responseStatus(), ctx.responseLength());
 
 					// apply complete filters
 					for (Filter filter : filters) {
 						try {
 							filter.complete(ctx, handler, th);
 						} catch (Exception e) {
-							Log.error(e, "Failed to apply filter: #{}: {} {} {}", ctx.id(), ctx.method(), ctx.path(), ctx.socket());
+							Log.error(e, "Failed to apply filter: {}: {} {} {}", ctx.id(), ctx.method(), ctx.path(), ctx.socket());
 						}
 					}
 
-					// discard pending request body
-					ctx.body().transferTo(OutputStream.nullOutputStream());
+					// discard possible pending request body
+					try (var body = ctx.body()) {
+						body.transferTo(OutputStream.nullOutputStream());
+					}
 				}
 			}
 

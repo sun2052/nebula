@@ -5,8 +5,9 @@ import java.io.OutputStream;
 
 // https://www.rfc-editor.org/rfc/rfc9112#name-transfer-codings
 public class ChunkedOutputStream extends OutputStream {
+	protected final byte[] CRLF = {'\r', '\n'};
 	protected OutputStream out;
-	private boolean closed;
+	protected boolean closed;
 
 	public ChunkedOutputStream(OutputStream out) {
 		this.out = out;
@@ -24,7 +25,7 @@ public class ChunkedOutputStream extends OutputStream {
 		}
 		writeChunk(len);
 		out.write(b, off, len);
-		out.write(HttpCodec.CRLF);
+		out.write(CRLF);
 	}
 
 	@Override
@@ -39,12 +40,14 @@ public class ChunkedOutputStream extends OutputStream {
 		}
 		closed = true;
 		writeChunk(0); // last-chunk
-		out.write(HttpCodec.CRLF);
 		out.flush();
 	}
 
 	private void writeChunk(long size) throws IOException {
-		out.write(Long.toHexString(size).getBytes());
-		out.write(HttpCodec.CRLF);
+		String header = Long.toHexString(size) + "\r\n";
+		if (size == 0) {
+			header += "\r\n";
+		}
+		out.write(header.getBytes());
 	}
 }

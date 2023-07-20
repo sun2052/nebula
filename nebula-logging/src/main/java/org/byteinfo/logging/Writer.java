@@ -63,8 +63,7 @@ public interface Writer extends AutoCloseable {
 			builder.append(className.substring(className.lastIndexOf('.') + 1));
 			builder.append('.');
 			builder.append(stackFrame.getMethodName());
-			builder.append("()@");
-			builder.append(stackFrame.getLineNumber());
+			builder.append("()");
 		}
 
 		builder.append(": ");

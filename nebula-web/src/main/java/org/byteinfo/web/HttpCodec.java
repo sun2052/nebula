@@ -27,8 +27,8 @@ import java.util.Map;
  * @see <a href="https://html.spec.whatwg.org/multipage/">HTML Standard</a>
  */
 public interface HttpCodec {
-	byte[] CRLF = {'\r', '\n'};
-	byte[] VERSION = "HTTP/1.1 ".getBytes();
+
+	/* ---------------- HTTP Decoder -------------- */
 
 	/**
 	 * Parses the HTTP request.
@@ -261,6 +261,9 @@ public interface HttpCodec {
 		return buffer.toString();
 	}
 
+
+	/* ---------------- HTTP Encoder -------------- */
+
 	/**
 	 * Sends a minimal HTTP response.
 	 *
@@ -269,7 +272,7 @@ public interface HttpCodec {
 	 * @throws IOException if an io error occurs
 	 */
 	static void send(OutputStream out, int status) throws IOException {
-		send(out, status, null, null, null, 0);
+		send(out, status, new Headers(), List.of(), null, 0, null);
 	}
 
 	/**
@@ -279,55 +282,39 @@ public interface HttpCodec {
 	 * @param status response status
 	 * @param headers response headers or null if not required
 	 * @param cookies response cookies or null if not required
+	 * @param type response content type
+	 * @param length response content length
 	 * @param data response body or null if not required
-	 * @param length response body length
 	 * @throws IOException if an io error occurs
 	 */
-	static void send(OutputStream out, int status, Headers headers, Collection<Cookie> cookies, InputStream data, long length) throws IOException {
-		// write status line
-		out.write(VERSION);
-		out.write(String.valueOf(status).getBytes());
-		out.write(CRLF);
-
-		// prepare headers
-		if (headers == null) {
-			headers = new Headers();
+	static void send(OutputStream out, int status, Headers headers, Collection<Cookie> cookies, String type, long length, InputStream data) throws IOException {
+		if (length != 0) {
+			headers.set(HeaderName.CONTENT_TYPE, type);
 		}
 		if (length >= 0) {
 			headers.set(HeaderName.CONTENT_LENGTH, String.valueOf(length));
 		} else {
 			headers.set(HeaderName.TRANSFER_ENCODING, HeaderValue.CHUNKED);
 		}
-
-		// encode cookies
-		if (cookies != null) {
-			for (Cookie cookie : cookies) {
-				if (cookie.getPath() == null) {
-					cookie.setPath("/");
-				}
-				headers.add(HeaderName.SET_COOKIE, cookie.toString());
-			}
+		for (Cookie cookie : cookies) {
+			headers.add(HeaderName.SET_COOKIE, cookie.toString());
 		}
 
-		// write headers
-		for (Header header : headers.values()) {
-			out.write(header.name().getBytes());
-			out.write(": ".getBytes());
-			out.write(header.value().getBytes());
-			out.write(CRLF);
-		}
-		out.write(CRLF);
+		String message = "HTTP/1.1 " + status + "\r\n" + headers + "\r\n";
+		out.write(message.getBytes());
 
-		// write response body
 		if (length != 0 && data != null) {
-			if (length > 0) {
-				data.transferTo(out);
-			} else {
-				try (var chunked = new ChunkedOutputStream(out)) {
-					data.transferTo(chunked);
+			try (data) {
+				if (length > 0) {
+					data.transferTo(out);
+				} else {
+					try (var chunked = new ChunkedOutputStream(out)) {
+						data.transferTo(chunked);
+					}
 				}
 			}
 		}
+
 		out.flush();
 	}
 }

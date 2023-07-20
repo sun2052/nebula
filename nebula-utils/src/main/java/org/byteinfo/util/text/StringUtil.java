@@ -4,23 +4,64 @@ package org.byteinfo.util.text;
  * StringUtil
  */
 public interface StringUtil {
-	static String strip(String target) {
-		return target == null ? null : target.strip();
+
+	static boolean isEmpty(String str) {
+		return str == null || str.length() == 0;
 	}
 
-	static boolean isEmpty(String target) {
-		return target == null || target.length() == 0;
+	static boolean isBlank(String str) {
+		return str == null || str.strip().length() == 0;
 	}
 
-	static boolean isNotEmpty(String target) {
-		return target != null && target.length() > 0;
+	static boolean isNotEmpty(String str) {
+		return !isEmpty(str);
 	}
 
-	static boolean isBlank(String target) {
-		return target == null || target.strip().length() == 0;
+	static boolean isNotBlank(String str) {
+		return !isBlank(str);
 	}
 
-	static boolean isNotBlank(String target) {
-		return target != null && target.strip().length() > 0;
+	static boolean isAnyEmpty(String... strs) {
+		for (String str : strs) {
+			if (isEmpty(str)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static boolean isAnyBlank(String... strs) {
+		for (String str : strs) {
+			if (isBlank(str)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static boolean isAllEmpty(String... strs) {
+		for (String str : strs) {
+			if (isNotEmpty(str)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	static boolean isAllBlank(String... strs) {
+		for (String str : strs) {
+			if (isNotBlank(str)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	static boolean isNoneEmpty(String... strs) {
+		return !isAnyEmpty(strs);
+	}
+
+	static boolean isNoneBlank(String... strs) {
+		return !isAnyBlank(strs);
 	}
 }

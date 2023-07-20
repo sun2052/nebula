@@ -39,4 +39,16 @@ public class Headers {
 	public List<Header> values() {
 		return headers;
 	}
+
+	@Override
+	public String toString() {
+		StringBuilder buf = new StringBuilder(256);
+		for (Header header : headers) {
+			buf.append(header.name());
+			buf.append(": ");
+			buf.append(header.value());
+			buf.append("\r\n");
+		}
+		return buf.toString();
+	}
 }

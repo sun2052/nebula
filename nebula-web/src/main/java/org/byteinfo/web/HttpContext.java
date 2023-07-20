@@ -10,6 +10,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.Socket;
@@ -30,7 +32,7 @@ public class HttpContext {
 	public static final String SESSION_COOKIE_NAME = AppConfig.get().get("session.name");
 	public static final String CONTEXT_PATH = AppConfig.get().get("http.contextPath");
 
-	private final long id;
+	private final String id;
 	private final Socket socket;
 	private final OutputStream out;
 
@@ -49,9 +51,12 @@ public class HttpContext {
 	private final Headers responseHeaders = new Headers();
 	private final Map<String, Cookie> responseCookies = new LinkedHashMap<>();
 	private long responseLength = -1;
+	private ResponseStream responseStream;
+	private Writer responseWriter;
+	private boolean headersSent;
 	private boolean committed;
 
-	public HttpContext(long id, Socket socket, OutputStream out, Request request) {
+	public HttpContext(String id, Socket socket, OutputStream out, Request request) {
 		this.id = id;
 		this.socket = socket;
 		this.out = out;
@@ -62,7 +67,7 @@ public class HttpContext {
 
 	/* ---------------- Request -------------- */
 
-	public long id() {
+	public String id() {
 		return id;
 	}
 
@@ -115,7 +120,7 @@ public class HttpContext {
 
 	public String param(String name) throws IOException {
 		List<String> list = params().get(name);
-		return list == null ? null : list.get(0);
+		return list == null ? null : list.getFirst();
 	}
 
 	public String param(String name, String defaultValue) throws IOException {
@@ -241,7 +246,7 @@ public class HttpContext {
 
 	public Upload file(String name) throws IOException {
 		List<Upload> list = files().get(name);
-		return list == null ? null : list.get(0);
+		return list == null ? null : list.getFirst();
 	}
 
 	public InputStream body() {
@@ -384,6 +389,20 @@ public class HttpContext {
 		this.responseLength = responseLength;
 	}
 
+	public OutputStream responseStream() {
+		if (responseStream == null) {
+			responseStream = new ResponseStream(out, this);
+		}
+		return responseStream;
+	}
+
+	public Writer responseWriter() {
+		if (responseWriter == null) {
+			responseWriter = new OutputStreamWriter(responseStream());
+		}
+		return responseWriter;
+	}
+
 	public void redirect(String url) throws Exception {
 		redirect(url, StatusCode.SEE_OTHER);
 	}
@@ -394,36 +413,47 @@ public class HttpContext {
 		commit(null);
 	}
 
-	public void download(String filename, byte[] data) throws Exception {
-		responseLength = data.length;
-		download(filename, new ByteArrayInputStream(data));
-	}
-
 	public void download(String filename, InputStream stream) throws Exception {
 		responseType = ContentType.BINARY;
 		String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8);
 		responseHeaders.set(HeaderName.CONTENT_DISPOSITION, String.format("attachment; filename*=%s''%s", StandardCharsets.UTF_8.name(), encoded));
-		commit(stream);
+		if (stream != null) {
+			commit(stream);
+		}
 	}
 
-	public void commit(Object result) throws Exception {
-		if (committed) {
-			throw new IllegalStateException("Response has already been committed.");
+	public void sendHeaders() throws IOException {
+		ensureNotCommitted();
+		ensureHeadersNotSent();
+		headersSent = true;
+		HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), responseType, responseLength, null);
+	}
+
+	public void commit(Object result) throws IOException {
+		ensureNotCommitted();
+		committed = true;
+
+		if (headersSent) {
+			if (responseWriter != null) {
+				responseWriter.close();
+			} else if (responseStream != null) {
+				responseStream.close();
+			}
+			return;
 		}
 
 		// parse result
-		InputStream in;
+		InputStream in = null;
 		if (result == null) {
-			in = null;
 			responseLength = 0;
 		} else if (result instanceof Result data) {
 			responseStatus = data.status();
 			responseType = data.type();
 			responseLength = data.length();
-			in = data.stream();
 			if (data.eTag() != null) {
 				responseHeaders.set(HeaderName.ETAG, data.eTag());
 			}
+			in = data.stream();
 		} else if (result instanceof String data) {
 			byte[] buffer = data.getBytes();
 			responseLength = buffer.length;
@@ -434,30 +464,38 @@ public class HttpContext {
 		} else if (result instanceof InputStream data) {
 			in = data;
 		} else {
-			throw new IllegalArgumentException("Unsupported result: " + result);
+			throw new IllegalArgumentException("Unsupported result type: " + result);
 		}
+
+		boolean bodySent = false;
 
 		// handle conditional request
 		String ifNoneMatch = headers().get(HeaderName.IF_NONE_MATCH);
 		if (ifNoneMatch != null) {
 			String eTag = responseHeaders.get(HeaderName.ETAG);
 			if (eTag != null && (ifNoneMatch.equals(eTag) || ifNoneMatch.contains(eTag))) {
-				responseStatus = StatusCode.NOT_MODIFIED;
-				responseLength = 0;
-				HttpCodec.send(out, responseStatus);
-				committed = true;
+				bodySent = true;
+				HttpCodec.send(out, StatusCode.NOT_MODIFIED);
 			}
 		}
 
-		// send response
-		if (!committed) {
-			if (responseLength != 0) {
-				responseHeaders.set(HeaderName.CONTENT_TYPE, responseType);
-			}
-			HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), in, responseLength);
-			committed = true;
+		// send full response
+		if (!bodySent) {
+			HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), responseType, responseLength, in);
 		}
 
 		IOUtil.closeQuietly(in);
+	}
+
+	private void ensureHeadersNotSent() {
+		if (headersSent) {
+			throw new IllegalStateException("Headers has already been sent.");
+		}
+	}
+
+	private void ensureNotCommitted() {
+		if (committed) {
+			throw new IllegalStateException("Response has already been committed.");
+		}
 	}
 }

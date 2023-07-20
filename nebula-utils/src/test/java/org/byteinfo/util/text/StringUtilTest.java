@@ -9,9 +9,6 @@ import org.junit.jupiter.api.Test;
 public class StringUtilTest {
 	@Test
 	void testStringUtil() {
-		Assertions.assertNull(StringUtil.strip(null));
-		Assertions.assertEquals("abc", StringUtil.strip("  \t  abc \t   \t  "));
-
 		Assertions.assertTrue(StringUtil.isEmpty(null));
 		Assertions.assertTrue(StringUtil.isEmpty(""));
 		Assertions.assertFalse(StringUtil.isEmpty("abc"));
