@@ -56,12 +56,13 @@ public class Server extends Context {
 		super(modules);
 
 		// load configurations
-		AppConfig.get().load("class:org/byteinfo/web/application.properties");
-		Log.info("Loading default config: org/byteinfo/web/application.properties");
+		String config = "org/byteinfo/web/application.properties";
+		AppConfig.get().load(config);
+		Log.info("Loading default config: " + config);
 
-		boolean loaded = AppConfig.get().loadIf("class:application.properties");
-		if (loaded) {
-			Log.info("Loading optional config: application.properties");
+		config = "application.properties";
+		if (AppConfig.get().loadOptional(config)) {
+			Log.info("Loading optional config: " + config);
 		}
 
 		// init runtime variables
@@ -74,8 +75,8 @@ public class Server extends Context {
 		// system properties have the highest priority
 		AppConfig.get().load(System.getProperties());
 
-		// interpolate variables
-		AppConfig.get().interpolate();
+		// resolve all variables
+		AppConfig.get().resolveAllVariables();
 
 		// init asset handler
 		assetHandler = new AssetHandler();

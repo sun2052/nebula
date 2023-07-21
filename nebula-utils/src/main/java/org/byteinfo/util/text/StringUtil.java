@@ -1,10 +1,6 @@
 package org.byteinfo.util.text;
 
-/**
- * StringUtil
- */
 public interface StringUtil {
-
 	static boolean isEmpty(String str) {
 		return str == null || str.length() == 0;
 	}
@@ -63,5 +59,23 @@ public interface StringUtil {
 
 	static boolean isNoneBlank(String... strs) {
 		return !isAnyBlank(strs);
+	}
+
+	static String truncate(String str, int maxLength) {
+		return truncate(str, 0, maxLength);
+	}
+
+	static String truncate(String str, int offset, int maxLength) {
+		if (str == null || str.isEmpty()) {
+			return str;
+		}
+		if (offset >= str.length()) {
+			return "";
+		}
+		if (str.length() > maxLength) {
+			int endIndex = Math.min(offset + maxLength, str.length());
+			return str.substring(offset, endIndex);
+		}
+		return str.substring(offset);
 	}
 }

@@ -1,23 +1,17 @@
 package org.byteinfo.web;
 
-import org.byteinfo.util.io.IOUtil;
-
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class AssetHandler implements Handler {
-	private final Path pathRoot;
+	private final Path fileRoot;
 	private final String classRoot;
 
 	public AssetHandler() {
-		String path = AppConfig.get().get("asset.pathRoot");
-		if (path == null) {
-			pathRoot = null;
-		} else {
-			pathRoot = Path.of(path);
-		}
+		String root = AppConfig.get().get("asset.fileRoot");
+		fileRoot = root == null ? null : Path.of(root);
 		classRoot = AppConfig.get().get("asset.classRoot");
 	}
 
@@ -26,14 +20,14 @@ public class AssetHandler implements Handler {
 		String path = context.path();
 		String type = ContentType.byFileName(path);
 
-		if (pathRoot != null) {
-			Path file = pathRoot.resolve(path.substring(1)).normalize();
-			if (file.startsWith(pathRoot) && Files.exists(file) && Files.isRegularFile(file)) {
+		if (fileRoot != null) {
+			Path file = fileRoot.resolve(path.substring(1)).normalize();
+			if (file.startsWith(fileRoot) && Files.exists(file) && Files.isRegularFile(file)) {
 				return Result.of(file.toUri().toURL()).setType(type);
 			}
 		}
 
-		URL url = IOUtil.classResource(classRoot + path);
+		URL url = ClassLoader.getSystemResource(classRoot + path);
 		if (url == null) {
 			throw new WebException(StatusCode.NOT_FOUND, "Resource not found: " + path);
 		}

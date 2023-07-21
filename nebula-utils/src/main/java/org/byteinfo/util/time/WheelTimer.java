@@ -14,7 +14,6 @@ import java.util.concurrent.Executors;
  * @implSpec This class is thread-safe.
  */
 public final class WheelTimer implements AutoCloseable {
-	private final ExecutorService executor;
 	private final long precision;
 	private final Slot[] wheel;
 
@@ -55,8 +54,6 @@ public final class WheelTimer implements AutoCloseable {
 		if (precision <= 0) {
 			throw new IllegalArgumentException(String.format("precision: %d (expected: precision > 0)", precision));
 		}
-
-		this.executor = executor;
 		this.precision = precision;
 
 		int size = 1;

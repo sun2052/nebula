@@ -1,7 +1,6 @@
 package org.byteinfo.web;
 
 import org.byteinfo.util.function.Unchecked;
-import org.byteinfo.util.io.IOUtil;
 import org.byteinfo.util.reflect.Reflect;
 import org.byteinfo.util.text.RandomUtil;
 import org.byteinfo.util.time.WheelTimer;
@@ -277,7 +276,7 @@ public class HttpContext {
 
 		if (create) {
 			while (true) {
-				String id = RandomUtil.getAlphaNumeric(SESSION_ID_LENGTH);
+				String id = RandomUtil.randomAlphaNumeric(SESSION_ID_LENGTH);
 				session = new Session(id);
 				Session previous = SESSIONS.putIfAbsent(id, session);
 				if (previous == null) {
@@ -467,24 +466,24 @@ public class HttpContext {
 			throw new IllegalArgumentException("Unsupported result type: " + result);
 		}
 
-		boolean bodySent = false;
+		try (var ignored = in) {
+			boolean bodySent = false;
 
-		// handle conditional request
-		String ifNoneMatch = headers().get(HeaderName.IF_NONE_MATCH);
-		if (ifNoneMatch != null) {
-			String eTag = responseHeaders.get(HeaderName.ETAG);
-			if (eTag != null && (ifNoneMatch.equals(eTag) || ifNoneMatch.contains(eTag))) {
-				bodySent = true;
-				HttpCodec.send(out, StatusCode.NOT_MODIFIED);
+			// handle conditional request
+			String ifNoneMatch = headers().get(HeaderName.IF_NONE_MATCH);
+			if (ifNoneMatch != null) {
+				String eTag = responseHeaders.get(HeaderName.ETAG);
+				if (eTag != null && (ifNoneMatch.equals(eTag) || ifNoneMatch.contains(eTag))) {
+					bodySent = true;
+					HttpCodec.send(out, StatusCode.NOT_MODIFIED);
+				}
+			}
+
+			// send full response
+			if (!bodySent) {
+				HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), responseType, responseLength, in);
 			}
 		}
-
-		// send full response
-		if (!bodySent) {
-			HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), responseType, responseLength, in);
-		}
-
-		IOUtil.closeQuietly(in);
 	}
 
 	private void ensureHeadersNotSent() {

@@ -6,7 +6,7 @@ package org.byteinfo.util.codec;
 public interface Hex {
 	char[] DIGITS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
-	static String encode(byte[] data) {
+	static String toHex(byte[] data) {
 		char[] chars = new char[data.length * 2];
 		int i = 0;
 		for (byte octet : data) {
@@ -16,7 +16,7 @@ public interface Hex {
 		return new String(chars);
 	}
 
-	static byte[] decode(String hex) {
+	static byte[] fromHex(String hex) {
 		char[] chars = hex.toCharArray();
 		if ((chars.length & 0x01) != 0) {
 			throw new IllegalArgumentException("Odd number of characters.");

@@ -8,19 +8,13 @@ import java.security.SecureRandom;
 public interface RandomUtil {
 	SecureRandom RANDOM = new SecureRandom();
 
-	static String getNumeric(int count) {
-		return get(count, "0123456789");
+	static byte[] random(int byteSize) {
+		byte[] bytes = new byte[byteSize];
+		RANDOM.nextBytes(bytes);
+		return bytes;
 	}
 
-	static String getAlphabetic(int count) {
-		return get(count, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-	}
-
-	static String getAlphaNumeric(int count) {
-		return get(count, "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-	}
-
-	static String get(int count, String chars) {
+	static String random(int count, String chars) {
 		int length = chars.length();
 		char[] result = new char[count];
 		for (int i = 0; i < count; i++) {
@@ -29,17 +23,15 @@ public interface RandomUtil {
 		return new String(result);
 	}
 
-	static String get(int count, char... chars) {
-		char[] result = new char[count];
-		for (int i = 0; i < count; i++) {
-			result[i] = chars[RANDOM.nextInt(chars.length)];
-		}
-		return new String(result);
+	static String randomNumeric(int count) {
+		return random(count, "0123456789");
 	}
 
-	static byte[] get(int byteSize) {
-		byte[] bytes = new byte[byteSize];
-		RANDOM.nextBytes(bytes);
-		return bytes;
+	static String randomAlphabetic(int count) {
+		return random(count, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+	}
+
+	static String randomAlphaNumeric(int count) {
+		return random(count, "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
 	}
 }

@@ -1,5 +1,7 @@
 package org.byteinfo.web;
 
+import org.byteinfo.util.io.FileUtil;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -50,12 +52,7 @@ public class ContentType {
 	}
 
 	public static String byFileName(String fileName) {
-		String extension = null;
-		int index = fileName.lastIndexOf('.');
-		if (index != -1) {
-			extension = fileName.substring(index + 1);
-		}
-		return byExtension(extension);
+		return byExtension(FileUtil.getExtension(fileName));
 	}
 
 	public static String byExtension(String extension) {

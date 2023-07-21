@@ -7,7 +7,8 @@ public interface SizeUtil {
 		String[] units = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
 		double size = bytes;
 		int i = 0;
-		while (size >= 1024) {
+		int lastIndex = units.length - 1;
+		while (size >= 1024 && i < lastIndex) {
 			size /= 1024;
 			i++;
 		}

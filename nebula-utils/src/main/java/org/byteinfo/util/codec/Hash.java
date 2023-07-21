@@ -13,7 +13,6 @@ public final class Hash {
 	public static final Hash SHA256 = new Hash("SHA-256");
 	public static final Hash SHA512 = new Hash("SHA-512");
 
-	private static final Base64.Encoder BASE64_ENCODER = Base64.getUrlEncoder().withoutPadding();
 	private final String algorithm;
 
 	private Hash(String algorithm) {
@@ -41,18 +40,18 @@ public final class Hash {
 	}
 
 	public String toHex(byte[]... dataList) {
-		return Hex.encode(toBytes(dataList));
+		return Hex.toHex(toBytes(dataList));
 	}
 
 	public String toHex(String... dataList) {
-		return Hex.encode(toBytes(dataList));
+		return Hex.toHex(toBytes(dataList));
 	}
 
 	public String toBase64(byte[]... dataList) {
-		return BASE64_ENCODER.encodeToString(toBytes(dataList));
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(toBytes(dataList));
 	}
 
 	public String toBase64(String... dataList) {
-		return BASE64_ENCODER.encodeToString(toBytes(dataList));
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(toBytes(dataList));
 	}
 }

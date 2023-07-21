@@ -1,10 +1,10 @@
 package org.byteinfo.util.misc;
 
-import org.byteinfo.util.io.IOUtil;
-
 import java.io.IOException;
-import java.io.Reader;
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -15,50 +15,50 @@ import java.util.regex.Pattern;
  * Config
  */
 public class Config {
-	private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
-
 	private final Properties properties = new Properties();
 
 	/**
-	 * Load configuration
+	 * Loads configurations
 	 *
-	 * @param resource configuration
+	 * @param config config file
 	 * @throws IOException exception
 	 */
-	public void load(String resource) throws IOException {
-		properties.load(IOUtil.reader(resource));
+	public void load(String config) throws IOException {
+		boolean loaded = loadOptional(config);
+		if (!loaded) {
+			throw new IllegalArgumentException("Config not found: " + config);
+		}
 	}
 
 	/**
-	 * Load configuration if exist
+	 * Loads optional configurations
 	 *
-	 * @param resource configuration
+	 * @param config config file
 	 * @return if loaded
 	 * @throws IOException exception
 	 */
-	public boolean loadIf(String resource) throws IOException {
-		Reader in = IOUtil.reader(resource);
-		if (in != null) {
-			properties.load(in);
-			return true;
-		}
-		return false;
+	public boolean loadOptional(String config) throws IOException {
+		return load(ClassLoader.getSystemResourceAsStream(config));
 	}
 
 	/**
-	 * Load configuration
+	 * Loads configurations
 	 *
-	 * @param reader configuration
+	 * @param stream input stream for config file
 	 * @throws IOException exception
 	 */
-	public void load(Reader reader) throws IOException {
-		try (reader) {
-			properties.load(reader);
+	public boolean load(InputStream stream) throws IOException {
+		if (stream == null) {
+			return false;
 		}
+		try (stream) {
+			properties.load(stream);
+		}
+		return true;
 	}
 
 	/**
-	 * Load configuration
+	 * Loads configurations
 	 *
 	 * @param config configuration
 	 */
@@ -67,43 +67,15 @@ public class Config {
 	}
 
 	/**
-	 * Interpolate variables in configuration
+	 * Resolves all variables.
 	 */
-	public void interpolate() {
-		properties.forEach((name, value) -> interpolateEntry((String) name, (String) value, new LinkedHashSet<>()));
-	}
-
-	// Interpolate variables recursively
-	private String interpolateEntry(String key, String value, Set<String> chain) {
-		Matcher matcher = VARIABLE_PATTERN.matcher(value);
-
-		while (matcher.find()) {
-			chain.add(key);
-			String variable = matcher.group(1);
-
-			// checking for circular reference
-			if (chain.contains(variable)) {
-				StringBuilder chainString = new StringBuilder();
-				chain.forEach(name -> chainString.append(name).append(" -> "));
-				throw new IllegalArgumentException("Circular Reference Detected: " + chainString.append(variable));
-			}
-
-			String target = properties.getProperty(variable);
-			if (target == null) {
-				throw new IllegalArgumentException("Variable[" + variable + "] Not Found.");
-			}
-
-			value = value.replace("${" + variable + "}", interpolateEntry(variable, target, chain));
-			properties.put(key, value);
-		}
-
-		chain.clear();
-
-		return value;
+	public void resolveAllVariables() {
+		Pattern variablePattern = Pattern.compile("\\$\\{([^}]+)}");
+		properties.forEach((name, value) -> resolveVariable((String) name, (String) value, variablePattern, new LinkedHashSet<>()));
 	}
 
 	/**
-	 * Get string value
+	 * Gets string value
 	 *
 	 * @param key config key
 	 * @return target or null
@@ -113,7 +85,7 @@ public class Config {
 	}
 
 	/**
-	 * Get string value with default
+	 * Gets string value with default
 	 *
 	 * @param key config key
 	 * @param defaultValue default
@@ -124,7 +96,7 @@ public class Config {
 	}
 
 	/**
-	 * Get int value
+	 * Gets int value
 	 *
 	 * @param key config key
 	 * @return target
@@ -135,7 +107,7 @@ public class Config {
 	}
 
 	/**
-	 * Get int value with default
+	 * Gets int value with default
 	 *
 	 * @param key config key
 	 * @param defaultValue default
@@ -154,7 +126,7 @@ public class Config {
 	}
 
 	/**
-	 * Get long value
+	 * Gets long value
 	 *
 	 * @param key config key
 	 * @return target
@@ -164,7 +136,7 @@ public class Config {
 	}
 
 	/**
-	 * Get long value with default
+	 * Gets long value with default
 	 *
 	 * @param key config key
 	 * @return target
@@ -183,7 +155,7 @@ public class Config {
 	}
 
 	/**
-	 * Get double value
+	 * Gets double value
 	 *
 	 * @param key config key
 	 * @return target
@@ -195,7 +167,7 @@ public class Config {
 	}
 
 	/**
-	 * Get double value with default
+	 * Gets double value with default
 	 *
 	 * @param key config key
 	 * @return target or default
@@ -213,7 +185,7 @@ public class Config {
 	}
 
 	/**
-	 * Get boolean value
+	 * Gets boolean value
 	 *
 	 * @param key config key
 	 * @return target
@@ -223,11 +195,39 @@ public class Config {
 	}
 
 	/**
-	 * Get all property names.
+	 * Gets all property names.
 	 *
 	 * @return unmodifiable set of property names
 	 */
 	public Set<String> getPropertyNames() {
 		return properties.stringPropertyNames();
+	}
+
+	// resolve variable recursively
+	private String resolveVariable(String key, String value, Pattern variablePattern, Set<String> variableChain) {
+		Matcher matcher = variablePattern.matcher(value);
+		while (matcher.find()) {
+			variableChain.add(key);
+			String variable = matcher.group(1);
+
+			// check for circular reference
+			if (variableChain.contains(variable)) {
+				List<String> list = new ArrayList<>(variableChain.size() + 1);
+				list.add(variable);
+				throw new IllegalArgumentException("Circular reference: " + String.join(" -> ", list));
+			}
+
+			// check for undefined variable
+			String target = properties.getProperty(variable);
+			if (target == null) {
+				throw new IllegalArgumentException("Variable undefined: " + variable);
+			}
+
+			// apply resolved variable
+			value = value.replace("${" + variable + "}", resolveVariable(variable, target, variablePattern, variableChain));
+			properties.put(key, value);
+		}
+		variableChain.clear();
+		return value;
 	}
 }
