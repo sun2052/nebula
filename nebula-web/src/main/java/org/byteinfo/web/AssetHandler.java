@@ -2,8 +2,10 @@ package org.byteinfo.web;
 
 import java.io.IOException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 
 public class AssetHandler implements Handler {
 	private final Path fileRoot;
@@ -17,20 +19,27 @@ public class AssetHandler implements Handler {
 
 	@Override
 	public Object handle(HttpContext context) throws IOException {
+		URL url = null;
 		String path = context.path();
-		String type = ContentType.byFileName(path);
-
 		if (fileRoot != null) {
 			Path file = fileRoot.resolve(path.substring(1)).normalize();
 			if (file.startsWith(fileRoot) && Files.exists(file) && Files.isRegularFile(file)) {
-				return Result.of(file.toUri().toURL()).setType(type);
+				url = file.toUri().toURL();
 			}
 		}
-
-		URL url = ClassLoader.getSystemResource(classRoot + path);
+		if (url == null) {
+			url = ClassLoader.getSystemResource(classRoot + path);
+		}
 		if (url == null) {
 			throw new WebException(StatusCode.NOT_FOUND, "Resource not found: " + path);
 		}
-		return Result.of(url).setType(type);
+
+		context.setResponseType(ContentType.byFileName(path));
+		URLConnection connection = url.openConnection();
+		long length = connection.getContentLengthLong();
+		long lastModified = connection.getLastModified();
+		context.setResponseLength(length);
+		context.responseHeaders().set(HeaderName.ETAG, '"' + Base64.getEncoder().withoutPadding().encodeToString((lastModified + "-" + length).getBytes()) + '"');
+		return connection.getInputStream();
 	}
 }

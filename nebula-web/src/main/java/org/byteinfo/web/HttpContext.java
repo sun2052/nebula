@@ -3,14 +3,13 @@ package org.byteinfo.web;
 import org.byteinfo.util.function.Unchecked;
 import org.byteinfo.util.reflect.Reflect;
 import org.byteinfo.util.text.RandomUtil;
+import org.byteinfo.util.text.StringUtil;
 import org.byteinfo.util.time.WheelTimer;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.Socket;
@@ -34,6 +33,7 @@ public class HttpContext {
 	private final String id;
 	private final Socket socket;
 	private final OutputStream out;
+	private final Map<Class<?>, Encoder> encoders;
 
 	// request
 	private final Request request;
@@ -51,14 +51,14 @@ public class HttpContext {
 	private final Map<String, Cookie> responseCookies = new LinkedHashMap<>();
 	private long responseLength = -1;
 	private ResponseStream responseStream;
-	private Writer responseWriter;
 	private boolean headersSent;
 	private boolean committed;
 
-	public HttpContext(String id, Socket socket, OutputStream out, Request request) {
+	public HttpContext(String id, Socket socket, OutputStream out, Map<Class<?>, Encoder> encoders, Request request) {
 		this.id = id;
 		this.socket = socket;
 		this.out = out;
+		this.encoders = encoders;
 		this.request = request;
 		this.path = request.path().substring(CONTEXT_PATH.length());
 	}
@@ -76,6 +76,10 @@ public class HttpContext {
 
 	public String method() {
 		return request.method();
+	}
+
+	public String target() {
+		return request.target();
 	}
 
 	public String path() {
@@ -395,13 +399,6 @@ public class HttpContext {
 		return responseStream;
 	}
 
-	public Writer responseWriter() {
-		if (responseWriter == null) {
-			responseWriter = new OutputStreamWriter(responseStream());
-		}
-		return responseWriter;
-	}
-
 	public void redirect(String url) throws Exception {
 		redirect(url, StatusCode.SEE_OTHER);
 	}
@@ -421,80 +418,57 @@ public class HttpContext {
 		}
 	}
 
-	public void sendHeaders() throws IOException {
-		ensureNotCommitted();
-		ensureHeadersNotSent();
-		headersSent = true;
-		HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), responseType, responseLength, null);
-	}
-
 	public void commit(Object result) throws IOException {
-		ensureNotCommitted();
+		if (committed) {
+			throw new IllegalStateException("Response has already been committed.");
+		}
 		committed = true;
 
-		if (headersSent) {
-			if (responseWriter != null) {
-				responseWriter.close();
-			} else if (responseStream != null) {
-				responseStream.close();
-			}
+		if (headersSent && responseStream != null) {
+			responseStream.close();
 			return;
 		}
 
-		// parse result
-		InputStream in = null;
 		if (result == null) {
 			responseLength = 0;
-		} else if (result instanceof Result data) {
-			responseStatus = data.status();
-			responseType = data.type();
-			responseLength = data.length();
-			if (data.eTag() != null) {
-				responseHeaders.set(HeaderName.ETAG, data.eTag());
-			}
-			in = data.stream();
-		} else if (result instanceof String data) {
-			byte[] buffer = data.getBytes();
-			responseLength = buffer.length;
-			in = new ByteArrayInputStream(buffer);
-		} else if (result instanceof byte[] data) {
-			responseLength = data.length;
-			in = new ByteArrayInputStream(data);
-		} else if (result instanceof InputStream data) {
-			in = data;
+			sendHeaders();
 		} else {
-			throw new IllegalArgumentException("Unsupported result type: " + result);
-		}
-
-		try (var ignored = in) {
-			boolean bodySent = false;
-
-			// handle conditional request
-			String ifNoneMatch = headers().get(HeaderName.IF_NONE_MATCH);
-			if (ifNoneMatch != null) {
-				String eTag = responseHeaders.get(HeaderName.ETAG);
-				if (eTag != null && (ifNoneMatch.equals(eTag) || ifNoneMatch.contains(eTag))) {
-					bodySent = true;
-					HttpCodec.send(out, StatusCode.NOT_MODIFIED);
-				}
+			InputStream in;
+			if (result instanceof String data) {
+				byte[] buffer = data.getBytes();
+				responseLength = buffer.length;
+				in = new ByteArrayInputStream(buffer);
+			} else if (result instanceof byte[] data) {
+				responseLength = data.length;
+				in = new ByteArrayInputStream(data);
+			} else if (result instanceof InputStream data) {
+				in = data;
+			} else {
+				in = encoders.getOrDefault(result.getClass(), Encoder.DEFAULT).encode(this, result);
 			}
 
-			// send full response
-			if (!bodySent) {
+			try (var ignored = in) {
+				// handle conditional request
+				String ifNoneMatch = headers().get(HeaderName.IF_NONE_MATCH);
+				String eTag = responseHeaders.get(HeaderName.ETAG);
+				if (StringUtil.isNotEmpty(ifNoneMatch) && ifNoneMatch.equals(eTag)) {
+					responseStatus = StatusCode.NOT_MODIFIED;
+					responseLength = 0;
+					HttpCodec.send(out, responseStatus);
+					return;
+				}
+
+				// send full response
 				HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), responseType, responseLength, in);
 			}
 		}
 	}
 
-	private void ensureHeadersNotSent() {
+	void sendHeaders() throws IOException {
 		if (headersSent) {
 			throw new IllegalStateException("Headers has already been sent.");
 		}
-	}
-
-	private void ensureNotCommitted() {
-		if (committed) {
-			throw new IllegalStateException("Response has already been committed.");
-		}
+		headersSent = true;
+		HttpCodec.send(out, responseStatus, responseHeaders, responseCookies.values(), responseType, responseLength, null);
 	}
 }

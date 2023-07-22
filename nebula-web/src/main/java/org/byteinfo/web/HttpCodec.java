@@ -52,7 +52,7 @@ public interface HttpCodec {
 			length = header == null ? 0 : Long.parseLong(header);
 			body = new LimitedInputStream(in, length);
 		}
-		return new Request(request.method(), request.path(), request.query(), headers, length, body);
+		return new Request(request.method(), request.target(), request.path(), request.query(), headers, length, body);
 	}
 
 	/**
@@ -72,14 +72,15 @@ public interface HttpCodec {
 			throw new WebException(StatusCode.BAD_REQUEST, "invalid request line: " + line);
 		}
 		String method = parts[0];
-		String path = parts[1];
+		String target = parts[1];
+		String path = target;
 		String query = null;
-		int index = path.indexOf('?');
+		int index = target.indexOf('?');
 		if (index != -1) {
-			query = path.substring(index + 1);
-			path = path.substring(0, index);
+			path = target.substring(0, index);
+			query = target.substring(index + 1);
 		}
-		return new RequestLine(method, path, query);
+		return new RequestLine(method, target, path, query);
 	}
 
 	/**

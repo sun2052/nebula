@@ -1,4 +1,4 @@
 package org.byteinfo.web;
 
-public record RequestLine(String method, String path, String query) {
+public record RequestLine(String method, String target, String path, String query) {
 }

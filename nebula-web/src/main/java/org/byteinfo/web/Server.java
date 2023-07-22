@@ -4,6 +4,7 @@ import org.byteinfo.context.Context;
 import org.byteinfo.logging.Log;
 import org.byteinfo.util.function.CheckedConsumer;
 import org.byteinfo.util.function.Unchecked;
+import org.byteinfo.util.misc.Config;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -40,6 +41,9 @@ public class Server extends Context {
 	// HTTP Filters
 	private final List<Filter> filters = new ArrayList<>();
 
+	// Result Encoders: result type -> result encoder
+	private final Map<Class<?>, Encoder> encoders = new HashMap<>();
+
 	// HTTP Security Attributes
 	private final Map<Handler, String> securityAttributes = new HashMap<>();
 
@@ -49,34 +53,40 @@ public class Server extends Context {
 	// HTTP Asset Handler
 	private final Handler assetHandler;
 
+	private final long startTime;
 	private volatile ServerSocket serverSocket;
 	private volatile boolean started;
 
 	public Server(Object... modules) throws IOException {
 		super(modules);
+		startTime = System.currentTimeMillis();
+		Log.info("Initializing Server...");
+		Log.info("JVM: name={}, version={}, pid={}", System.getProperty("java.vm.name"), System.getProperty("java.vm.version"), ProcessHandle.current().pid());
+		Log.info("OS: name={}, arch={}, version={}", System.getProperty("os.name"), System.getProperty("os.arch"), System.getProperty("os.version"));
 
 		// load configurations
-		String config = "org/byteinfo/web/application.properties";
-		AppConfig.get().load(config);
-		Log.info("Loading default config: " + config);
+		Config config = AppConfig.get();
+		String configFile = "org/byteinfo/web/application.properties";
+		config.load(configFile);
+		Log.info("Loading default config: " + configFile);
 
-		config = "application.properties";
-		if (AppConfig.get().loadOptional(config)) {
-			Log.info("Loading optional config: " + config);
+		configFile = "application.properties";
+		if (config.loadOptional(configFile)) {
+			Log.info("Loading optional config: " + configFile);
 		}
 
 		// init runtime variables
 		int processors = Runtime.getRuntime().availableProcessors();
-		AppConfig.get().load(Map.of(
+		config.load(Map.of(
 				"runtime.pid", ProcessHandle.current().pid(),
 				"runtime.processors", processors
 		));
 
 		// system properties have the highest priority
-		AppConfig.get().load(System.getProperties());
+		config.load(System.getProperties());
 
 		// resolve all variables
-		AppConfig.get().resolveAllVariables();
+		config.resolveAllVariables();
 
 		// init asset handler
 		assetHandler = new AssetHandler();
@@ -87,10 +97,13 @@ public class Server extends Context {
 			return this;
 		}
 		started = true;
-		int port = AppConfig.get().getInt("http.port");
-		int backlog = AppConfig.get().getInt("http.backlog");
-		int bufferSize = AppConfig.get().getInt("tcp.bufferSize");
-		InetAddress bindAddr = InetAddress.getByName(AppConfig.get().get("http.bindAddr"));
+
+		// start server socket
+		Config config = AppConfig.get();
+		int port = config.getInt("http.port");
+		int backlog = config.getInt("http.backlog");
+		int bufferSize = config.getInt("tcp.bufferSize");
+		InetAddress bindAddr = InetAddress.getByName(config.get("http.bindAddr"));
 		serverSocket = new ServerSocket();
 		serverSocket.setReuseAddress(true);
 		serverSocket.setReceiveBufferSize(bufferSize);
@@ -123,7 +136,7 @@ public class Server extends Context {
 		}
 		main.setName(getClass().getSimpleName() + "-" + port);
 		main.start();
-		Log.info("Server started: http://127.0.0.1:{} listening {}", port, bindAddr);
+		Log.info("Server started in {} ms: http://127.0.0.1:{}", System.currentTimeMillis() - startTime, port);
 		return this;
 	}
 
@@ -234,14 +247,22 @@ public class Server extends Context {
 
 	public Server error(ErrorHandler handler) {
 		ensureNotStarted();
-		this.errorHandler = handler;
+		errorHandler = handler;
 		return this;
 	}
 
 	public Server error(Class<? extends ErrorHandler> clazz) {
+		return error(instance(clazz));
+	}
+
+	public Server encoder(Class<?> type, Encoder handler) {
 		ensureNotStarted();
-		errorHandler = instance(clazz);
+		encoders.put(type, handler);
 		return this;
+	}
+
+	public Server encoder(Class<?> type, Class<? extends Encoder> clazz) {
+		return encoder(type, instance(clazz));
 	}
 
 	private void ensureNotStarted() {
@@ -261,8 +282,9 @@ public class Server extends Context {
 			Throwable th = null;
 			try {
 				// parse request
-				ctx = new HttpContext(connectionId + "#" + counter.incrementAndGet(), socket, out, HttpCodec.parseRequest(in));
-				Log.debug("{}: {} {}", ctx.id(), ctx.method(), ctx.path());
+				String contextId = connectionId + "#" + counter.incrementAndGet();
+				ctx = new HttpContext(contextId, socket, out, encoders, HttpCodec.parseRequest(in));
+				Log.debug("{}: {} {}", ctx.id(), ctx.method(), ctx.target());
 
 				// search for handler: exact handler > generic handler > asset handler
 				handler = exactHandlers.getOrDefault(ctx.path(), Map.of()).get(ctx.method());
@@ -317,7 +339,11 @@ public class Server extends Context {
 					}
 					throw e;
 				} else {
-					result = errorHandler.handle(ctx, th);
+					try {
+						result = errorHandler.handle(ctx, th);
+					} catch (Exception ex) {
+						Log.error(e, "Failed to apply error handler: {}: {} {} {}", ctx.id(), ctx.method(), ctx.target(), ctx.socket());
+					}
 				}
 			} finally {
 				if (ctx != null) {
@@ -332,7 +358,7 @@ public class Server extends Context {
 						try {
 							filter.complete(ctx, handler, th);
 						} catch (Exception e) {
-							Log.error(e, "Failed to apply filter: {}: {} {} {}", ctx.id(), ctx.method(), ctx.path(), ctx.socket());
+							Log.error(e, "Failed to apply filter: {}: {} {} {}", ctx.id(), ctx.method(), ctx.target(), ctx.socket());
 						}
 					}
 
