@@ -341,7 +341,7 @@ public class Proxy<T> {
 
 	private void checkIndex(int index, int length) {
 		if (index < 0 || index >= length) {
-			throw new IllegalArgumentException(String.format("index: %d (expected: 0 <= index < %d)", index, length));
+			throw new IllegalArgumentException("index: %d (expected: 0 <= index < %d)".formatted(index, length));
 		}
 	}
 

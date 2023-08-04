@@ -326,6 +326,14 @@ public class HttpContext {
 		}
 	}
 
+	public String scheme() {
+		String scheme = headers().get(HeaderName.FORWARDED_PROTO);
+		if (scheme == null) {
+			scheme = "http";
+		}
+		return scheme;
+	}
+
 	public String domain() {
 		return host().split(":", 2)[0];
 	}
@@ -412,7 +420,7 @@ public class HttpContext {
 	public void download(String filename, InputStream stream) throws Exception {
 		responseType = ContentType.BINARY;
 		String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8);
-		responseHeaders.set(HeaderName.CONTENT_DISPOSITION, String.format("attachment; filename*=%s''%s", StandardCharsets.UTF_8.name(), encoded));
+		responseHeaders.set(HeaderName.CONTENT_DISPOSITION, "attachment; filename*=%s''%s".formatted(StandardCharsets.UTF_8.name(), encoded));
 		if (stream != null) {
 			commit(stream);
 		}

@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
@@ -21,6 +22,10 @@ public class FileWriter implements Writer {
 	private volatile BufferedWriter writer;
 
 	public FileWriter(Path target, Rolling rolling, int backups) {
+		if (Files.notExists(target.getParent())) {
+			throw new LogException("Path not exist: " + target.getParent());
+		}
+		Objects.requireNonNull(rolling);
 		this.target = target;
 		this.rolling = rolling;
 		this.backups = backups;

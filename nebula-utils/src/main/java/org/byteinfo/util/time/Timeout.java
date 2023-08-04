@@ -109,6 +109,6 @@ public class Timeout {
 
 	@Override
 	public String toString() {
-		return String.format("Timeout{state=%d, deadline=%d, pendingRounds=%d}", state, deadline, pendingRounds);
+		return "Timeout{state=%d, deadline=%d, pendingRounds=%d}".formatted(state, deadline, pendingRounds);
 	}
 }

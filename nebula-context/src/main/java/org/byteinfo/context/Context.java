@@ -170,7 +170,7 @@ public class Context {
 					field.set(target, getProvider(key, deps).get());
 				}
 			} catch (ReflectiveOperationException e) {
-				throw new ContextException(String.format("Can't inject field %s in %s", field.getName(), target.getClass().getName()), e);
+				throw new ContextException("Can't inject field %s in %s".formatted(field.getName(), target.getClass().getName()), e);
 			}
 		}
 
@@ -194,7 +194,7 @@ public class Context {
 			try {
 				method.invoke(target);
 			} catch (ReflectiveOperationException e) {
-				throw new ContextException(String.format("Can't call @PostConstruct method %s:%s", method.getClass(), method.getName()), e);
+				throw new ContextException("Can't call @PostConstruct method %s:%s".formatted(method.getClass(), method.getName()), e);
 			}
 		}
 	}

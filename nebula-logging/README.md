@@ -7,7 +7,7 @@ Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementa
 Features
 --------
 
-* Lightweight: **19 KB**
+* Lightweight: **20 KB**
 * Concise API
 * Dynamic Configuration
 * Console and File output with Rolling support
@@ -18,33 +18,35 @@ Features
 Documentation
 -------------
 
-### Syntax
+### Config Syntax
 ```
-[output][:option1][:option2][:optionN]
-[output][;option1][;option2][;optionN]
-
-output: stdout, stderr, /path/to/file.{}.log
-option: name=value
-
-options:
-level = trace, debug, info, warn, error, off
-rolling = none, daily, monthly
-backups = max number of old log files to keep
-
-default:
+# stdout, stderr, /path/to/file.log.{}
 output = stdout
+
+# trace, debug, info, warn, error, off
 level = info
-rolling = none, file output only
-backups = 30, file output only
+
+# none, daily, monthly
+rolling = none
+
+# max number of old log files to keep
+backups = 30
 ```
 
-### Apply Config
+### Config Priority: from lowest to highest
 ```
-# Java API
-Log.applyConfig("-Dnlog=/path/to/file.{}.log:rolling=daily:backups=30");
+# default config
+org/byteinfo/logging/logging.properties
 
-# system properties
-java -Dnlog=/path/to/file.{}.log:rolling=daily:backups=30 -jar app.jar
+# custom config
+logging.properties
+
+# system properties: name1=value1[:name2=value2][:nameN=valueN]
+java -Dlogging=output=/path/to/file.log.{}:rolling=daily:backups=30 -jar app.jar
+
+# java api
+Log.setLevel(Level.DEBUG);
+Log.setWriter(new ConsoleWriter(System.err));
 ```
 
 ### Usage

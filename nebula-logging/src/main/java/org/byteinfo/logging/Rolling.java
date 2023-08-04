@@ -4,46 +4,54 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 
 public class Rolling {
-	private final DateTimeFormatter formatter;
-	private final ChronoUnit unit;
-
 	/**
 	 * No Rolling
 	 */
-	public static final Rolling NONE = new Rolling(null, null) {
-		@Override
-		public String getRollingSuffix(long time) {
-			return "";
-		}
-
-		@Override
-		public long getNextRollingTime(long time) {
-			return Long.MAX_VALUE;
-		}
-	};
+	public static final Rolling NONE = new Rolling();
 
 	/**
 	 * Daily, 20160117
 	 */
-	public static final Rolling DAILY = new Rolling("yyyyMMdd", ChronoUnit.DAYS);
+	public static final Rolling DAILY = new Rolling() {
+		private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneId.systemDefault());
+
+		@Override
+		public String getRollingSuffix(long millis) {
+			return FORMATTER.format(Instant.ofEpochMilli(millis));
+		}
+
+		@Override
+		public long getNextRollingTime(long millis) {
+			return Instant.ofEpochMilli(millis).plus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.DAYS).toEpochMilli();
+
+		}
+	};
 
 	/**
 	 * Monthly, 201601
 	 */
-	public static final Rolling MONTHLY = new Rolling("yyyyMM", ChronoUnit.MONTHS);
+	public static final Rolling MONTHLY = new Rolling() {
+		private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMM").withZone(ZoneId.systemDefault());
 
-	private Rolling(String format, ChronoUnit unit) {
-		this.formatter = format == null ? null : DateTimeFormatter.ofPattern(format).withZone(ZoneId.systemDefault());
-		this.unit = unit;
+		@Override
+		public String getRollingSuffix(long millis) {
+			return FORMATTER.format(Instant.ofEpochMilli(millis));
+		}
+
+		@Override
+		public long getNextRollingTime(long millis) {
+			return Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).with(TemporalAdjusters.firstDayOfNextMonth()).truncatedTo(ChronoUnit.DAYS).toInstant().toEpochMilli();
+		}
+	};
+
+	public String getRollingSuffix(long millis) {
+		return "";
 	}
 
-	public String getRollingSuffix(long time) {
-		return formatter.format(Instant.ofEpochMilli(time));
-	}
-
-	public long getNextRollingTime(long time) {
-		return Instant.ofEpochMilli(time).truncatedTo(unit).plus(1, unit).toEpochMilli();
+	public long getNextRollingTime(long millis) {
+		return Long.MAX_VALUE;
 	}
 }

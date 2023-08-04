@@ -1,9 +1,8 @@
 package org.byteinfo.logging;
 
-import java.nio.file.Files;
+import java.io.InputStream;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Properties;
 import java.util.function.Supplier;
 
 public final class Log {
@@ -11,97 +10,38 @@ public final class Log {
 	private static volatile Writer writer;
 
 	static {
-		applyConfig(System.getProperty("nlog"));
+		try {
+			Properties config = new Properties();
+			config.load(ClassLoader.getSystemResourceAsStream("org/byteinfo/logging/logging.properties"));
+			InputStream in = ClassLoader.getSystemResourceAsStream("logging.properties");
+			if (in != null) {
+				config.load(in);
+			}
+			String configString = System.getProperty("logging");
+			if (configString != null) {
+				for (String optionStr : configString.split("[:;]")) {
+					String[] option = optionStr.split("=", 2);
+					config.setProperty(option[0], option[1]);
+				}
+			}
+			level = Level.valueOf(config.getProperty("level").toUpperCase());
+			String output = config.getProperty("output");
+			switch (output) {
+				case "stdout" -> writer = new ConsoleWriter(System.out);
+				case "stderr" -> writer = new ConsoleWriter(System.err);
+				default -> {
+					Path path = Path.of(output);
+					Rolling rolling = (Rolling) Rolling.class.getDeclaredField(config.getProperty("rolling").toUpperCase()).get(null);
+					int backups = Integer.parseInt(config.getProperty("backups"));
+					writer = new FileWriter(path, rolling, backups);
+				}
+			}
+		} catch (Exception e) {
+			throw new LogException("Failed to load logging config", e);
+		}
 	}
 
 	private Log() {
-	}
-
-	/**
-	 * Parses and apply the specified config string.
-	 *
-	 * <pre>
-	 * [output][:option1][:option2][:optionN]
-	 * [output][;option1][;option2][;optionN]
-	 *
-	 * output: stdout, stderr, /path/to/file.{}.log
-	 * option: name=value
-	 *
-	 * options:
-	 * level = trace, debug, info, warn, error, off
-	 * rolling = none, daily, monthly
-	 * backups = max number of old log files to keep
-	 *
-	 * default:
-	 * output = stdout
-	 * level = info
-	 * rolling = none, file output only
-	 * backups = 30, file output only
-	 * </pre>
-	 *
-	 * @param config the config string
-	 */
-	public static void applyConfig(String config) {
-		level = Level.INFO;
-		writer = new ConsoleWriter(System.out);
-		if (config == null) {
-			return;
-		}
-
-		String output = "stdout";
-		Map<String, String> options = new HashMap<>();
-		for (String optionStr : config.split("[:;]")) {
-			if (optionStr.isEmpty()) {
-				continue;
-			}
-			String[] option = optionStr.split("=", 2);
-			if (option.length == 1) {
-				output = option[0];
-			} else {
-				options.put(option[0], option[1]);
-			}
-		}
-
-		Rolling rolling = Rolling.NONE;
-		int backups = 30;
-		for (Map.Entry<String, String> option : options.entrySet()) {
-			switch (option.getKey()) {
-				case "level" -> {
-					try {
-						level = Level.valueOf(option.getValue().toUpperCase());
-					} catch (Exception e) {
-						throw new LogException("invalid level option: " + option.getValue() + ", expected: [trace, debug, info, warn, error, off]");
-					}
-				}
-				case "rolling" -> {
-					try {
-						rolling = (Rolling) Rolling.class.getDeclaredField(option.getValue().toUpperCase()).get(null);
-					} catch (Exception e) {
-						throw new LogException("invalid rolling option: " + option.getValue() + ", expected: [none, daily, monthly]");
-					}
-				}
-				case "backups" -> {
-					try {
-						backups = Integer.parseInt(option.getValue());
-					} catch (Exception e) {
-						throw new LogException("invalid backups option: " + option.getValue() + ", expected: >= 0");
-					}
-				}
-				default -> throw new LogException("unknown config option: " + option.getKey() + ", expected: [level, rolling, backups]");
-			}
-		}
-
-		switch (output) {
-			case "stdout" -> writer = new ConsoleWriter(System.out);
-			case "stderr" -> writer = new ConsoleWriter(System.err);
-			default -> {
-				Path path = Path.of(output);
-				if (Files.notExists(path.getParent())) {
-					throw new LogException("invalid output config: " + output + ", parent path does not exist");
-				}
-				writer = new FileWriter(path, rolling, backups);
-			}
-		}
 	}
 
 	public static void setLevel(Level level) {
@@ -128,7 +68,7 @@ public final class Log {
 	 * Logs a message with an optional list of parameters.
 	 *
 	 * @param message the string message with optional "{}" placeholders.
-	 * @param params an optional list of parameters to the message (may be none).
+	 * @param params an optional list of parameters to the message.
 	 */
 	public static void trace(String message, Object... params) {
 		dispatch(Level.TRACE, message, params, null, null);

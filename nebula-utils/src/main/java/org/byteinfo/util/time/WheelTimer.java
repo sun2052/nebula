@@ -49,10 +49,10 @@ public final class WheelTimer implements AutoCloseable {
 	public WheelTimer(ExecutorService executor, int wheelSize, int precision) {
 		Objects.requireNonNull(executor, "executor");
 		if (wheelSize <= 0 || wheelSize > 1 << 30) {
-			throw new IllegalArgumentException(String.format("wheelSize: %d (expected: 0 < wheelSize <= %d)", wheelSize, 1 << 30));
+			throw new IllegalArgumentException("wheelSize: %d (expected: 0 < wheelSize <= %d)".formatted(wheelSize, 1 << 30));
 		}
 		if (precision <= 0) {
-			throw new IllegalArgumentException(String.format("precision: %d (expected: precision > 0)", precision));
+			throw new IllegalArgumentException("precision: %d (expected: precision > 0)".formatted(precision));
 		}
 		this.precision = precision;
 
@@ -65,7 +65,7 @@ public final class WheelTimer implements AutoCloseable {
 			wheel[i] = new Slot();
 		}
 
-		Thread.ofVirtual().name(String.format("%s-%d-%d", getClass().getSimpleName(), size, precision)).start(() -> {
+		Thread.ofVirtual().name("%s-%d-%d".formatted(getClass().getSimpleName(), size, precision)).start(() -> {
 			int mask = wheel.length - 1; // y = Math.pow(2, n); x % y == x & (y - 1)
 			int tick = 0;
 			long diff = 0;
@@ -157,7 +157,7 @@ public final class WheelTimer implements AutoCloseable {
 
 	@Override
 	public String toString() {
-		return String.format("WheelTimer{wheelSize=%d, precision=%d, started=%s}", wheel.length, precision, started);
+		return "WheelTimer{wheelSize=%d, precision=%d, started=%s}".formatted(wheel.length, precision, started);
 	}
 
 	private static class Holder {

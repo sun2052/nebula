@@ -44,7 +44,7 @@ Quick Start
 class Target {
 	public String test(String str) {
 		String obj = str + " World.";
-		System.out.println(String.format("Executing: arg=%s, result=%s", str, obj));
+		System.out.println("Executing: arg=%s, result=%s".formatted(str, obj));
 		return obj;
 	}
 }
@@ -58,10 +58,10 @@ class MyAdvice implements Advice {
 	public Object apply() throws Exception {
 		String arg0 = (String) ProxyTarget.argument(0);
 		String arg1 = "Hi";
-		System.out.println(String.format("Before: arg=%s -> arg=%s", arg0, arg1));
+		System.out.println("Before: arg=%s -> arg=%s".formatted(arg0, arg1));
 		ProxyTarget.setArgument(arg1, 0);
 		Object obj = ProxyTarget.proceed();
-		System.out.println(String.format("After: result=%s", obj));
+		System.out.println("After: result=%s".formatted(obj));
 		return obj;
 	}
 }
