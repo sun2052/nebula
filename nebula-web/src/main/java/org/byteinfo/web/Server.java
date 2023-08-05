@@ -72,7 +72,7 @@ public class Server extends Context {
 
 		configFile = "application.properties";
 		if (config.loadOptional(configFile)) {
-			Log.info("Loading optional config: " + configFile);
+			Log.info("Loading custom config: " + configFile);
 		}
 
 		// init runtime variables
@@ -284,7 +284,7 @@ public class Server extends Context {
 				// parse request
 				String contextId = connectionId + "#" + counter.incrementAndGet();
 				ctx = new HttpContext(contextId, socket, out, encoders, HttpCodec.parseRequest(in));
-				Log.debug("{}: {} {}", ctx.id(), ctx.method(), ctx.target());
+				Log.debug("{}: {} {}://{}{} IP={}", ctx.id(), ctx.method(), ctx.scheme(), ctx.host(), ctx.target(), ctx.address());
 
 				// search for handler: exact handler > generic handler > asset handler
 				handler = exactHandlers.getOrDefault(ctx.path(), Map.of()).get(ctx.method());
@@ -342,7 +342,7 @@ public class Server extends Context {
 					try {
 						result = errorHandler.handle(ctx, th);
 					} catch (Exception ex) {
-						Log.error(e, "Failed to apply error handler: {}: {} {} {}", ctx.id(), ctx.method(), ctx.target(), ctx.socket());
+						Log.error(e, "Failed to apply error handler: {}: {} {}://{}{} IP={}, UA={}", ctx.id(), ctx.method(), ctx.scheme(), ctx.host(), ctx.target(), ctx.address(), ctx.userAgent());
 					}
 				}
 			} finally {
@@ -358,7 +358,7 @@ public class Server extends Context {
 						try {
 							filter.complete(ctx, handler, th);
 						} catch (Exception e) {
-							Log.error(e, "Failed to apply filter: {}: {} {} {}", ctx.id(), ctx.method(), ctx.target(), ctx.socket());
+							Log.error(e, "Failed to apply filter: {}: {} {}://{}{} IP={}, UA={}", ctx.id(), ctx.method(), ctx.scheme(), ctx.host(), ctx.target(), ctx.address(), ctx.userAgent());
 						}
 					}
 

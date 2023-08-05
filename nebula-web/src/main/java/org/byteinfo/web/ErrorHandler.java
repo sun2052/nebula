@@ -10,7 +10,7 @@ public interface ErrorHandler {
 		} else {
 			ctx.setResponseStatus(StatusCode.INTERNAL_SERVER_ERROR);
 		}
-		Log.error(t, "Failed to handle request: {}: {} {} {}", ctx.id(), ctx.method(), ctx.target(), ctx.socket());
+		Log.error(t, "Failed to handle request: {}: {} {}://{}{} IP={}, UA={}", ctx.id(), ctx.method(), ctx.scheme(), ctx.host(), ctx.target(), ctx.address(), ctx.userAgent());
 		return "ERROR: " + ctx.responseStatus();
 	};
 

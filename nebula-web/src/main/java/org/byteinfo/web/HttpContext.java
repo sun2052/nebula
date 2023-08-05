@@ -309,20 +309,16 @@ public class HttpContext {
 		return HeaderValue.XML_HTTP_REQUEST.equals(headers().get(HeaderName.REQUESTED_WITH));
 	}
 
-	public String host() {
-		String host = headers().get(HeaderName.FORWARDED_HOST);
-		if (host == null) {
-			host = headers().get(HeaderName.HOST);
-		}
-		return host;
+	public String userAgent() {
+		return headers().get(HeaderName.USER_AGENT);
 	}
 
-	public int port() {
-		String port = headers().get(HeaderName.FORWARDED_PORT);
-		if (port != null) {
-			return Integer.parseInt(port);
+	public String address() {
+		String address = headers().get(HeaderName.FORWARDED_FOR);
+		if (address != null) {
+			return address.split(",", 2)[0];
 		} else {
-			return socket.getLocalPort();
+			return socket.getInetAddress().getHostAddress();
 		}
 	}
 
@@ -334,18 +330,28 @@ public class HttpContext {
 		return scheme;
 	}
 
+	public String host() {
+		String host = headers().get(HeaderName.FORWARDED_HOST);
+		if (host == null) {
+			host = headers().get(HeaderName.HOST);
+		}
+		return host;
+	}
+
 	public String domain() {
 		return host().split(":", 2)[0];
 	}
 
-	public String remoteAddress() {
-		// X-Forwarded-For: <client>, <proxy1>, <proxy2>
-		String address = headers().get(HeaderName.FORWARDED_FOR);
-		if (address != null) {
-			return address.split(",", 2)[0];
-		} else {
-			return socket.getInetAddress().getHostAddress();
+	public int port() {
+		String port = headers().get(HeaderName.FORWARDED_PORT);
+		if (port == null) {
+			String[] parts = host().split(":", 2);
+			if (parts.length == 1) {
+				return scheme().equals("http") ? 80 : 443;
+			}
+			port = parts[1];
 		}
+		return Integer.parseInt(port);
 	}
 
 	void setSecurityAttribute(String attribute) {

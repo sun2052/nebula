@@ -1,6 +1,8 @@
 package org.byteinfo.web;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
@@ -19,21 +21,28 @@ public class AssetHandler implements Handler {
 
 	@Override
 	public Object handle(HttpContext context) throws IOException {
-		URL url = null;
 		String path = context.path();
+		URL url = null;
+
+		// check file path
 		if (fileRoot != null) {
-			Path file = fileRoot.resolve(path.substring(1)).normalize();
-			if (file.startsWith(fileRoot) && Files.exists(file) && Files.isRegularFile(file)) {
-				url = file.toUri().toURL();
-			}
-		}
-		if (url == null) {
-			url = ClassLoader.getSystemResource(classRoot + path);
-		}
-		if (url == null) {
-			throw new WebException(StatusCode.NOT_FOUND, "Resource not found: " + path);
+			url = getFileAsset(Path.of(fileRoot + path), fileRoot);
 		}
 
+		// check classpath
+		if (url == null) {
+			url = ClassLoader.getSystemResource(classRoot + path);
+			if (url != null && "file".equals(url.getProtocol())) { // if in IDE
+				url = getFileAsset(new File(url.getPath()).toPath(), new File(ClassLoader.getSystemResource(classRoot).getPath()).toPath());
+			}
+		}
+
+		// ignore directory
+		if (url == null || url.getPath().endsWith("/")) {
+			throw new WebException(StatusCode.NOT_FOUND, "Asset not found: " + path);
+		}
+
+		// set asset info
 		context.setResponseType(ContentType.byFileName(path));
 		URLConnection connection = url.openConnection();
 		long length = connection.getContentLengthLong();
@@ -41,5 +50,13 @@ public class AssetHandler implements Handler {
 		context.setResponseLength(length);
 		context.responseHeaders().set(HeaderName.ETAG, '"' + Base64.getEncoder().withoutPadding().encodeToString((lastModified + "-" + length).getBytes()) + '"');
 		return connection.getInputStream();
+	}
+
+	private URL getFileAsset(Path asset, Path root) throws MalformedURLException {
+		asset = asset.normalize();
+		if (asset.startsWith(root) && Files.exists(asset) && Files.isRegularFile(asset)) {
+			return asset.toUri().toURL();
+		}
+		return null;
 	}
 }

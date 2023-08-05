@@ -13,9 +13,9 @@ public interface HeaderName {
 	String SET_COOKIE = "set-cookie";
 	String ETAG = "etag";
 	String IF_NONE_MATCH = "if-none-match";
+	String REQUESTED_WITH = "x-requested-with";
+	String FORWARDED_FOR = "x-forwarded-for";
+	String FORWARDED_PROTO = "x-forwarded-proto";
 	String FORWARDED_HOST = "x-forwarded-host";
 	String FORWARDED_PORT = "x-forwarded-port";
-	String FORWARDED_PROTO = "x-forwarded-proto";
-	String FORWARDED_FOR = "x-forwarded-for";
-	String REQUESTED_WITH = "x-requested-with";
 }
