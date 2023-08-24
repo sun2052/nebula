@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * JDBC Util
@@ -177,14 +178,18 @@ public interface JDBC {
 	}
 
 	static <T> List<T> selectList(Connection connection, T query, String appendix, int limit, int offset) throws SQLException {
-		Map<String, Object> params = getAllParams(query);
-		StringBuilder sql = new StringBuilder(256);
-		sql.append("select * from `").append(query.getClass().getSimpleName()).append("` where 1 = 1");
-		List<Object> args = new ArrayList<>();
-		for (Map.Entry<String, Object> entry : params.entrySet()) {
-			sql.append(" and `").append(entry.getKey()).append("` = ?");
-			args.add(entry.getValue());
+		Objects.requireNonNull(query);
+		String columns = Reflect.getInstanceFields(query.getClass()).keySet().stream().map(name -> "`" + name + "`").collect(Collectors.joining(", "));
+		if (columns.isEmpty()) {
+			return List.of();
 		}
+		StringBuilder sql = new StringBuilder(256);
+		sql.append("select ").append(columns).append(" from `").append(query.getClass().getSimpleName()).append("` where 1 = 1");
+		List<Object> args = new ArrayList<>();
+		getAllParams(query).forEach((key, value) -> {
+			sql.append(" and `").append(key).append("` = ?");
+			args.add(value);
+		});
 		if (appendix != null) {
 			sql.append(" ").append(appendix);
 		}
@@ -198,14 +203,13 @@ public interface JDBC {
 	}
 
 	static <T> int selectCount(Connection connection, T query) throws SQLException {
-		Map<String, Object> params = getAllParams(query);
 		StringBuilder sql = new StringBuilder(256);
 		sql.append("select count(*) from `").append(query.getClass().getSimpleName()).append("` where 1 = 1");
 		List<Object> args = new ArrayList<>();
-		for (Map.Entry<String, Object> entry : params.entrySet()) {
-			sql.append(" and `").append(entry.getKey()).append("` = ?");
-			args.add(entry.getValue());
-		}
+		getAllParams(query).forEach((key, value) -> {
+			sql.append(" and `").append(key).append("` = ?");
+			args.add(value);
+		});
 		return count(connection, sql.toString(), args.toArray());
 	}
 
@@ -217,18 +221,13 @@ public interface JDBC {
 		List<String> columns = new ArrayList<>();
 		List<String> placeholders = new ArrayList<>();
 		List<Object> args = new ArrayList<>();
-		for (Map.Entry<String, Object> entry : params.entrySet()) {
-			columns.add("`" + entry.getKey() + "`");
+		params.forEach((key, value) -> {
+			columns.add("`" + key + "`");
 			placeholders.add("?");
-			args.add(entry.getValue());
-		}
-		StringBuilder sql = new StringBuilder(256);
-		sql.append("insert into `").append(data.getClass().getSimpleName()).append("` (");
-		sql.append(String.join(", ", columns));
-		sql.append(") values (");
-		sql.append(String.join(", ", placeholders));
-		sql.append(")");
-		return insert(connection, sql.toString(), args.toArray());
+			args.add(value);
+		});
+		String sql = "insert into `" + data.getClass().getSimpleName() + "` (" + String.join(", ", columns) + ") values (" + String.join(", ", placeholders) + ")";
+		return insert(connection, sql, args.toArray());
 	}
 
 	static <T> int updateData(Connection connection, T data) throws SQLException {
@@ -243,10 +242,10 @@ public interface JDBC {
 		}
 		List<String> columns = new ArrayList<>();
 		List<Object> args = new ArrayList<>();
-		for (Map.Entry<String, Object> entry : params.entrySet()) {
-			columns.add("`" + entry.getKey() + "` = ?");
-			args.add(entry.getValue());
-		}
+		params.forEach((key, value) -> {
+			columns.add("`" + key + "` = ?");
+			args.add(value);
+		});
 		StringBuilder sql = new StringBuilder(256);
 		sql.append("update `").append(data.getClass().getSimpleName()).append("` set ");
 		sql.append(String.join(", ", columns));
@@ -256,10 +255,10 @@ public interface JDBC {
 				query = null;
 			} else {
 				sql.append(" where 1 = 1");
-				for (Map.Entry<String, Object> entry : conditions.entrySet()) {
-					sql.append(" and `").append(entry.getKey()).append("` = ?");
-					args.add(entry.getValue());
-				}
+				conditions.forEach((key, value) -> {
+					sql.append(" and `").append(key).append("` = ?");
+					args.add(value);
+				});
 			}
 		}
 		if (query == null) {
@@ -277,10 +276,10 @@ public interface JDBC {
 		StringBuilder sql = new StringBuilder(256);
 		sql.append("delete from `").append(query.getClass().getSimpleName()).append("` where 1 = 1");
 		List<Object> args = new ArrayList<>();
-		for (Map.Entry<String, Object> entry : params.entrySet()) {
-			sql.append(" and `").append(entry.getKey()).append("` = ?");
-			args.add(entry.getValue());
-		}
+		params.forEach((key, value) -> {
+			sql.append(" and `").append(key).append("` = ?");
+			args.add(value);
+		});
 		return update(connection, sql.toString(), args.toArray());
 	}
 
