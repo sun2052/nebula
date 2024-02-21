@@ -1,6 +1,6 @@
 package org.byteinfo.proxy;
 
-import jdk.internal.classfile.MethodModel;
+import java.lang.classfile.MethodModel;
 
 @FunctionalInterface
 public interface Pointcut {

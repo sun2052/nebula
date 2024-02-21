@@ -1,7 +1,7 @@
 Nebula Proxy
 ============
 
-Lightweight Dynamic Proxy Generator using [JEP draft: Class-File API (Preview)](https://openjdk.org/jeps/8280389)
+Lightweight Dynamic Proxy Generator using [JEP 457: Class-File API (Preview)](https://openjdk.org/jeps/457)
 
 
 Features
@@ -22,9 +22,7 @@ Documentation
 
 ### Compile Time and Run Time Options (Class-File API)
 ```
---add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED
---add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED
---add-exports=java.base/jdk.internal.classfile.attribute=ALL-UNNAMED
+--enable-preview
 ```
 
 ### Usage

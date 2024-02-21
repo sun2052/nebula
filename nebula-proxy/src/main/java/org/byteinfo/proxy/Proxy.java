@@ -1,26 +1,25 @@
 package org.byteinfo.proxy;
 
-import jdk.internal.classfile.AccessFlags;
-import jdk.internal.classfile.AttributedElement;
-import jdk.internal.classfile.Attributes;
-import jdk.internal.classfile.ClassBuilder;
-import jdk.internal.classfile.ClassModel;
-import jdk.internal.classfile.Classfile;
-import jdk.internal.classfile.CodeBuilder;
-import jdk.internal.classfile.CodeElement;
-import jdk.internal.classfile.MethodBuilder;
-import jdk.internal.classfile.MethodModel;
-import jdk.internal.classfile.Opcode;
-import jdk.internal.classfile.TypeKind;
-import jdk.internal.classfile.instruction.ConstantInstruction;
-import jdk.internal.classfile.instruction.IncrementInstruction;
-import jdk.internal.classfile.instruction.InvokeInstruction;
-import jdk.internal.classfile.instruction.LoadInstruction;
-import jdk.internal.classfile.instruction.NopInstruction;
-import jdk.internal.classfile.instruction.ReturnInstruction;
-import jdk.internal.classfile.instruction.StoreInstruction;
-
 import java.io.IOException;
+import java.lang.classfile.AccessFlags;
+import java.lang.classfile.AttributedElement;
+import java.lang.classfile.Attributes;
+import java.lang.classfile.ClassBuilder;
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassModel;
+import java.lang.classfile.CodeBuilder;
+import java.lang.classfile.CodeElement;
+import java.lang.classfile.MethodBuilder;
+import java.lang.classfile.MethodModel;
+import java.lang.classfile.Opcode;
+import java.lang.classfile.TypeKind;
+import java.lang.classfile.instruction.ConstantInstruction;
+import java.lang.classfile.instruction.IncrementInstruction;
+import java.lang.classfile.instruction.InvokeInstruction;
+import java.lang.classfile.instruction.LoadInstruction;
+import java.lang.classfile.instruction.NopInstruction;
+import java.lang.classfile.instruction.ReturnInstruction;
+import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
@@ -100,7 +99,7 @@ public class Proxy<T> {
 		if (cm.flags().has(AccessFlag.FINAL)) {
 			throw new IllegalArgumentException("Only non-final class can be proxied: " + targetClass);
 		}
-		byte[] bytes = Classfile.build(proxyClassType, List.of(Classfile.Option.processDebug(false)), cb -> {
+		byte[] bytes = ClassFile.of().build(proxyClassType, cb -> {
 			cb.withFlags(cm.flags().flagsMask()).withSuperclass(cm.thisClass());
 			cm.findAttributes(Attributes.SIGNATURE).forEach(cb::with);
 			cm.findAttributes(Attributes.RUNTIME_VISIBLE_ANNOTATIONS).forEach(cb::with);
@@ -152,13 +151,11 @@ public class Proxy<T> {
 		if (in == null) {
 			throw new IllegalArgumentException(clazz + " not found.");
 		}
-		byte[] bytes;
 		try (in) {
-			bytes = in.readAllBytes();
+			return ClassFile.of().parse(in.readAllBytes());
 		} catch (IOException e) {
 			throw new ProxyException(e);
 		}
-		return Classfile.parse(bytes);
 	}
 
 	private void copyAttributes(MethodBuilder builder, AttributedElement source) {

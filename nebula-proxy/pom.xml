@@ -19,11 +19,15 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<configuration>
 					<compilerArgs>
-						<arg>--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED</arg>
-						<arg>--add-exports=java.base/jdk.internal.classfile.instruction=ALL-UNNAMED</arg>
-						<arg>--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED</arg>
-						<arg>--add-exports=java.base/jdk.internal.classfile.attribute=ALL-UNNAMED</arg>
+						<arg>--enable-preview</arg>
 					</compilerArgs>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<argLine>--enable-preview</argLine>
 				</configuration>
 			</plugin>
 		</plugins>

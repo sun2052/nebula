@@ -60,7 +60,7 @@ Lightweight Logging Framework with [SLF4J API](https://www.slf4j.org) Implementa
 Lightweight Dependency Injection ([JSR 330](https://www.jcp.org/en/jsr/detail?id=330)) Implementation
 
 ### [Nebula Proxy](nebula-proxy)
-Lightweight Dynamic Proxy Generator using [JEP draft: Class-File API (Preview)](https://openjdk.org/jeps/8280389)
+Lightweight Dynamic Proxy Generator using [JEP 457: Class-File API (Preview)](https://openjdk.org/jeps/457)
 
 ### [Nebula Utils](nebula-utils)
 Lightweight Common Utilities
